@@ -40,7 +40,7 @@ harbor = ["harbor>=0.22.0"]
 dumemeval = "dumemeval.cli:main"
 
 [build-system]
-requires = ["uv_build>=0.8.4,<0.9.0"]
+requires = ["uv_build>=0.8.4,<0.13.0"]
 build-backend = "uv_build"
 
 # ── uv 配置 ─────────────────────────────────────────────────────────────────
