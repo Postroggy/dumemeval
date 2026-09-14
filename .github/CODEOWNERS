@@ -1,0 +1,10 @@
+# Review 路由：改到哪层，谁负责看。
+# 维护者：GitHub @Postroggy
+
+* @Postroggy
+
+src/dumemeval/adapters/    @Postroggy
+src/dumemeval/datasets/    @Postroggy
+src/dumemeval/metrics/     @Postroggy
+src/dumemeval/core/        @Postroggy
+src/dumemeval/lifecycle/   @Postroggy

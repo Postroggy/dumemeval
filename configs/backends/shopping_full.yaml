@@ -1,0 +1,59 @@
+# DuMemEval benchmark 数据集评测示例
+# 场景：MemoryArena bundled_shopping（agent multi-turn 购物）
+# 数据：`dumemeval prepare` 下载到缓存（${DUMEMEVAL_DATA_DIR:-~/.cache/dumemeval/datasets}）
+#      完整 bundled_shopping（150 样本）。默认真跑对照用 configs/smoke/shopping_*.yaml。
+#
+#   .venv/bin/python -m dumemeval run --config configs/backends/shopping_full.yaml --mock
+#   .venv/bin/python -m dumemeval run --config configs/backends/shopping_full.yaml
+
+experiment:
+  name: shopping-demo
+  description: "MemoryArena bundled_shopping：多回合购物，官方指标 match_ground_truth / overall_success"
+  protocol: memory_session_transfer
+  version: "0.2.0"
+
+agent:
+  runtime: claude-code
+  model: DeepSeek-V4-Flash[1M]
+  setup_timeout_sec: 900
+
+memory:
+  name: directory-demo
+  type: directory
+  path: results/memory/directory-demo
+
+task:
+  # ★ benchmark 声明：sessions 由适配器 build_tasks 生成（覆盖下面的占位）
+  benchmark: memoryarena_shopping
+  task_environment:
+    type: webshop
+    base_url: ${WEBSHOP_ENV_URL:-http://127.0.0.1:8005}
+  data:
+    type: local
+    name: bundled_shopping
+  sessions:
+    # 占位（协议要求 >=2 session）；实际运行时由 benchmark 适配器生成
+    - instruction: "（由 benchmark 适配器生成）"
+      placeholder: true
+    - instruction: "（由 benchmark 适配器生成）"
+      placeholder: true
+  memory_ground_truth: ""
+
+judging:
+  type: llm_judge
+  prompt: task_success
+  model: DeepSeek-V4-Flash
+  base_url: ${ANTHROPIC_BASE_URL}
+  api_key_env: ANTHROPIC_AUTH_TOKEN
+
+execution:
+  engine: harbor                       # harbor（真实隔离执行）/ mock（验证编排）
+  environment:
+    type: docker
+    env:
+      ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL}
+
+output:
+  dir: results
+  tasks_dir: tasks_generated

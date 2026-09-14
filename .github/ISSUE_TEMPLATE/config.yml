@@ -1,0 +1,4 @@
+# blank_issues_enabled: false 时，用户只能从模板里选。
+# 「文档 / 其它」模板（docs.md）兜底一切非模板事项，不设空白 Issue。
+# 没有公开 GitHub Discussions，故不写 contact_links（避免假链接）。
+blank_issues_enabled: false

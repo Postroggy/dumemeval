@@ -1,0 +1,55 @@
+# 默认 real smoke 基线：LoCoMo 官方子集 × 无 memory 注入（test_only）
+# 与 locomo_transfer.yaml 同数据、同 agent、同 judge。
+
+experiment:
+  name: smoke-locomo-test-only
+  description: "locomo_smoke × directory × test_only（无记忆基线）× claude-code"
+  protocol: test_only
+  version: "0.2.0"
+
+agent:
+  runtime: claude-code
+  model: DeepSeek-V4-Flash[1M]
+  setup_timeout_sec: 900
+
+memory:
+  name: directory-locomo-smoke-baseline
+  type: directory
+  path: results/smoke/locomo_test_only/memory
+
+task:
+  memory_instruction: none
+  benchmark: locomo
+  data:
+    type: local
+    name: locomo_smoke
+  sessions:
+    - instruction: "（由 benchmark 适配器生成）"
+      placeholder: true
+      memory_inject: false
+    - instruction: "（由 benchmark 适配器生成）"
+      placeholder: true
+      memory_inject: false
+
+judging:
+  type: llm_judge
+  prompt: memory_qa
+  model: DeepSeek-V4-Flash
+  base_url: ${ANTHROPIC_BASE_URL}
+  api_key_env: ANTHROPIC_AUTH_TOKEN
+
+execution:
+  engine: harbor
+  n_concurrent: 1
+  environment:
+    type: docker
+    force_build: true
+    docker_image: dumeval-claude-code:latest
+    env:
+      ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL}
+
+output:
+  dir: results/smoke/locomo_test_only
+  tasks_dir: tasks_generated/smoke/locomo_test_only

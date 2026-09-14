@@ -1,0 +1,81 @@
+"""BenchmarkAdapter：数据集适配协议。
+
+设计要点：
+- 只负责把类型化 benchmark 数据转换为可执行的 EvalTask
+- 判分和官方指标聚合由 evaluation 层负责
+"""
+
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from typing import Any, ClassVar
+
+from pydantic import BaseModel
+
+from ..models import EvalTask
+
+
+class BenchmarkData(BaseModel, ABC):
+    """数据集原始数据的类型化包装。
+
+    子类定义自己的字段（如 LoCoMoData.conversations）。
+    加载层（DatasetLoader）产出后，由适配器子类解析成具体类型。
+    """
+
+    @classmethod
+    @abstractmethod
+    def from_raw(cls, raw: Any) -> BenchmarkData:
+        """从加载的原始数据构造（原始数据来自 DatasetLoader）。"""
+        raise NotImplementedError
+
+
+class BenchmarkAdapter(ABC):
+    """数据集适配协议。
+
+    子类实现：
+        name:            数据集名（registry 用）
+        data_type:       BenchmarkData 子类（该数据集的数据类型）
+        build_tasks():   从类型化数据构建 EvalTask 列表（供执行管线运行）
+    """
+
+    name: ClassVar[str] = ""
+
+    @property
+    @abstractmethod
+    def data_type(self) -> type[BenchmarkData]:
+        """该数据集的数据类型（BenchmarkData 子类）。"""
+        raise NotImplementedError
+
+    @abstractmethod
+    def build_tasks(self, data: BenchmarkData) -> list[EvalTask]:
+        """从类型化数据构建 EvalTask 列表。
+
+        适配器自定义参数（如 ``subset`` / ``max_questions``）由**具体子类**
+        声明为具名关键字参数，经配置 ``task.benchmark_options`` 透传——
+        基类不设 ``**options``（避免调用方绕过子类签名约束）。
+        """
+        raise NotImplementedError
+
+
+# ── 注册表 ──────────────────────────────────────────────────────────────────
+
+_BENCHMARK_REGISTRY: dict[str, type[BenchmarkAdapter]] = {}
+
+
+def register_benchmark(cls: type[BenchmarkAdapter]) -> type[BenchmarkAdapter]:
+    """注册 benchmark 适配器（装饰器）。"""
+    _BENCHMARK_REGISTRY[cls.name] = cls
+    return cls
+
+
+def get_benchmark(name: str) -> BenchmarkAdapter:
+    """按名创建 benchmark 适配器实例。"""
+    cls = _BENCHMARK_REGISTRY.get(name)
+    if cls is None:
+        raise ValueError(f"Unknown benchmark: {name!r}. Supported: {list(_BENCHMARK_REGISTRY)}")
+    return cls()
+
+
+def benchmark_names() -> list[str]:
+    """所有已注册的 benchmark 名。"""
+    return list(_BENCHMARK_REGISTRY)

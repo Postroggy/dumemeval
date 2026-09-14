@@ -1,0 +1,66 @@
+# 默认 real smoke 基线：bundled_shopping 2 回合 × 无 memory 注入（test_only）
+#
+# 与 shopping_transfer.yaml 同数据、同 agent、同 judge；唯一自变量是协议。
+#
+#   .venv/bin/python -m dumemeval run --config configs/smoke/shopping_test_only.yaml --mock
+#   .venv/bin/python -m dumemeval run --config configs/smoke/shopping_test_only.yaml --no-resume
+
+experiment:
+  name: smoke-shopping-test-only
+  description: "shopping smoke 2 回合 × directory × test_only（无记忆基线）"
+  protocol: test_only
+  version: "0.2.0"
+
+agent:
+  runtime: claude-code
+  model: DeepSeek-V4-Flash[1M]
+  setup_timeout_sec: 900
+
+memory:
+  name: directory-shopping-smoke-baseline
+  type: directory
+  path: results/smoke/shopping_test_only/memory
+
+task:
+  memory_instruction: none
+  benchmark: memoryarena_shopping
+  benchmark_options:
+    subset: 1
+    max_questions: 2
+  task_environment:
+    type: webshop
+    base_url: ${WEBSHOP_ENV_URL:-http://127.0.0.1:8005}
+  data:
+    type: local
+    name: shopping_smoke
+  sessions:
+    - instruction: "（由 benchmark 适配器生成）"
+      placeholder: true
+      memory_inject: false
+    - instruction: "（由 benchmark 适配器生成）"
+      placeholder: true
+      memory_inject: false
+
+judging:
+  type: llm_judge
+  prompt: task_success
+  model: DeepSeek-V4-Flash
+  base_url: ${ANTHROPIC_BASE_URL}
+  api_key_env: ANTHROPIC_AUTH_TOKEN
+  skip_failed: true
+
+execution:
+  engine: harbor
+  n_concurrent: 1
+  environment:
+    type: docker
+    force_build: true
+    docker_image: dumeval-claude-code:latest
+    env:
+      ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL}
+
+output:
+  dir: results/smoke/shopping_test_only
+  tasks_dir: tasks_generated/smoke/shopping_test_only

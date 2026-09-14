@@ -1,0 +1,62 @@
+# 默认 real smoke：LoCoMo 官方子集 × directory memory × 跨 session 传递
+#
+# 数据：data/smoke/locomo_smoke.json = 官方对话 conv-26 的 session_1..4 +
+#       evidence 落在其内的 5 题（5 类别 × 各 1 题）。真实 memory 语义。
+#       （内置子集，随仓库分发，零下载；完整 locomo10 用 `dumemeval prepare`）
+#
+# runtime 用 Harbor 官方 claude-code（BYOK 走进程 ANTHROPIC_*），不用 hermes：
+# Harbor 0.22 hermes adapter 会执行非法子命令 `hermes version`。
+#
+#   .venv/bin/python -m dumemeval run --config configs/smoke/locomo_transfer.yaml --no-resume
+
+experiment:
+  name: smoke-locomo-transfer
+  description: "locomo_smoke × directory × memory_session_transfer × proactive × claude-code"
+  protocol: memory_session_transfer
+  version: "0.2.0"
+
+agent:
+  runtime: claude-code
+  model: DeepSeek-V4-Flash[1M]
+  skills_dir: examples/skills/claude-code
+  setup_timeout_sec: 900
+
+memory:
+  name: directory-locomo-smoke
+  type: directory
+  path: results/smoke/locomo_transfer/memory
+
+task:
+  memory_instruction: proactive
+  benchmark: locomo
+  data:
+    type: local
+    name: locomo_smoke
+  sessions:
+    - instruction: "（由 benchmark 适配器生成）"
+      placeholder: true
+    - instruction: "（由 benchmark 适配器生成）"
+      placeholder: true
+
+judging:
+  type: llm_judge
+  prompt: memory_qa
+  model: DeepSeek-V4-Flash
+  base_url: ${ANTHROPIC_BASE_URL}
+  api_key_env: ANTHROPIC_AUTH_TOKEN
+
+execution:
+  engine: harbor
+  n_concurrent: 1
+  environment:
+    type: docker
+    force_build: true
+    docker_image: dumeval-claude-code:latest
+    env:
+      ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL}
+
+output:
+  dir: results/smoke/locomo_transfer
+  tasks_dir: tasks_generated/smoke/locomo_transfer
