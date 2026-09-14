@@ -1,0 +1,54 @@
+# 自带数据的 benchmark 示例：不需要下载任何数据集即可跑通
+#
+# 数据：examples/data/locomo_mini.json（仓库自带，1 个对话 / 2 session / 4 题）
+#       格式与 LoCoMo 官方一致，内容为本项目自造的示例对话（非官方数据）
+#
+#   make example            # mock，无 Docker 无密钥
+#   dumemeval run --config examples/locomo_mini.yaml --mock
+#
+# ⚠️ 这份配置用于验证「装完能跑」，分数无学术意义。
+#    真实 LoCoMo 评测请按 docs/datasets/README.md 获取官方数据。
+
+experiment:
+  name: example-locomo-mini
+  description: "自带迷你数据的 LoCoMo 格式示例（装完即可跑，无外部依赖）"
+  protocol: memory_session_transfer
+  version: "0.1.0"
+
+agent:
+  runtime: claude-code
+  model: DeepSeek-V4-Flash[1M]
+
+memory:
+  name: directory-example
+  type: directory
+  path: results/example/memory
+
+task:
+  # agent-first：告知 agent 持久记忆的存在，让它主动读写（none=基线）
+  memory_instruction: proactive
+  benchmark: locomo
+  benchmark_options:
+    subset: 1
+    max_questions: 4
+  data:
+    type: local
+    path: examples/data/locomo_mini.json
+  sessions:
+    # 占位（协议要求 >=2 session）；实际由 benchmark 适配器生成
+    - instruction: "（由 benchmark 适配器生成）"
+      placeholder: true
+    - instruction: "（由 benchmark 适配器生成）"
+      placeholder: true
+
+judging:
+  # 示例用规则判分，避免要求 API key；真实评测用 llm_judge
+  type: rule
+
+execution:
+  engine: mock
+  n_concurrent: 1
+
+output:
+  dir: results/example
+  tasks_dir: tasks_generated/example

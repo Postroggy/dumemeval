@@ -1,0 +1,82 @@
+# DuMemEval × EverOS（EverMind memory runtime）官方 memory 后端评测
+# 场景：LoCoMo 对话灌入 EverOS（官方 ADD+FLUSH）→ 逐题检索（官方 SEARCH，
+#       method=agentic/top_k=10）→ episodes 注入 agent（官方 ANSWER context）
+#       → agent 回答 → 官方 F1 + 按类 accuracy
+#
+# EverOS 定位：HTTP memory 服务（Markdown 真源 + SQLite/LanceDB 索引），
+# 其官方 benchmark（benchmarks/run.py）即 LoCoMo——本配置 = 官方管线的
+# dumemeval 化（被测后端换成任意 agent 均可）。
+#
+# 前置：
+#   1. 启动 EverOS server（QUICKSTART.md；默认 http://localhost:8000），
+#      everos.toml 设 [memorize] mode = "chat"（官方 benchmark 要求）
+#   2. 进程环境变量提供密钥（ANTHROPIC_AUTH_TOKEN / ANTHROPIC_BASE_URL）
+#
+# 运行：
+#   mock（验证编排，无需 server）：
+#     .venv/bin/python -m dumemeval run --config configs/backends/locomo_everos.yaml --mock
+#   真实（需 EverOS server 在跑）：
+#     .venv/bin/python -m dumemeval run --config configs/backends/locomo_everos.yaml
+
+experiment:
+  name: locomo-everos
+  description: "LoCoMo × EverOS 官方 memory 后端（官方 ADD/SEARCH 管线 + F1/accuracy）"
+  protocol: memory_session_transfer
+  version: "0.1.0"
+
+agent:
+  runtime: hermes                        # 任意 agent；检索 context 已注入 env，agent 也可主动调 EverOS API
+  model: anthropic/DeepSeek-V4-Flash
+  setup_timeout_sec: 900
+
+memory:
+  name: everos
+  type: everos                           # ★ EverOS 官方 /api/v1/memory/* 协议
+  base_url: http://localhost:8000        # EverOS server
+  user_id: speaker_a                     # 官方 eval_owner（按 speaker 分区检索）
+  config:
+    app_id: locomo_benchmark             # 官方默认 app_id
+    project_id: ""                       # 空 = 每次评测生成唯一命名空间（隔离；可比性场景可固定）
+    method: agentic                      # 官方 config.toml 默认
+    top_k: 10
+    batch_size: 25
+    ready_wait_sec: 0                    # >0 时 inject 前轮询 search 就绪（替代官方 cascade/OME 轮询）
+
+task:
+  benchmark: locomo
+  benchmark_options:
+    subset: 1
+    max_questions: 3
+  data:
+    type: local
+    name: locomo
+  sessions:
+    - instruction: "（由 benchmark 适配器生成）"
+      placeholder: true
+    - instruction: "（由 benchmark 适配器生成）"
+      placeholder: true
+  memory_ground_truth: ""
+
+judging:
+  type: llm_judge
+  prompt: task_success
+  model: DeepSeek-V4-Flash
+  base_url: ${ANTHROPIC_BASE_URL}
+  api_key_env: ANTHROPIC_AUTH_TOKEN
+
+execution:
+  engine: harbor
+  n_concurrent: 1
+  environment:
+    type: docker
+    force_build: false
+    docker_image: dumeval-hermes:latest
+    env:
+      ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL}
+      # agent 容器需能访问宿主 EverOS server（OrbStack/Docker Desktop 用 host.docker.internal）
+      EVEROS_REACHABLE_BASE_URL: http://host.docker.internal:8000
+
+output:
+  dir: results
+  tasks_dir: tasks_generated

@@ -1,0 +1,85 @@
+# DuMemEval × Hermes 官方内置 memory（builtin provider）smoke test
+# 场景：LoCoMo 取 1 个对话（subset=1）→ 历史对话灌入 Hermes MEMORY.md →
+#       agent 基于 memory 回答问题 → 官方 F1/accuracy
+#
+# Hermes 官方内置 memory 语义（对齐 hermes-agent tools/memory_tool.py）：
+#   - $HERMES_HOME/memories/MEMORY.md（agent 笔记，上限 2200 字符）
+#   - $HERMES_HOME/memories/USER.md（用户画像，上限 1375 字符）
+#   - 条目用 § 分隔；session 启动时冻结快照进 system prompt（session 期间不变）
+#   - agent 通过 memory 工具 add/replace/remove 写（唯一子串匹配）
+#
+# 运行（编排/链路验证，无需真实 agent）：
+#   .venv/bin/python -m dumemeval run --config configs/backends/locomo_hermes_builtin.yaml --mock
+# 真实执行（需 Harbor + 预装 hermes 镜像）：
+#   1. 构建镜像（含 hermes + uv，Dockerfile 见下）：
+#        docker build -t dumeval-hermes:latest -f - . <<'EOF'
+#        FROM python:3.13-slim
+#        RUN apt-get update && apt-get install -y --no-install-recommends curl git ripgrep xz-utils && rm -rf /var/lib/apt/lists/*
+#        RUN pip install --no-cache-dir uv
+#        RUN curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup && \
+#            ln -sf /usr/local/lib/hermes-agent/venv/bin/hermes /usr/local/bin/hermes && hermes --version
+#        RUN pip install --no-cache-dir openai
+#        EOF
+#   2. 进程环境变量提供密钥（ANTHROPIC_AUTH_TOKEN / ANTHROPIC_BASE_URL）；
+#      yaml 用 ${VAR} 引用，Harbor 官方 claude-code/hermes adapter 再 exec 进容器
+#   3. Harbor hermes agent 需幂等补丁（已装跳过 installer）：见 vendors/harbor 改动说明
+#   .venv/bin/python -m dumemeval run --config configs/backends/locomo_hermes_builtin.yaml
+
+experiment:
+  name: locomo-hermes-builtin-smoke
+  description: "LoCoMo subset=1 × Hermes 官方内置 memory（MEMORY.md/USER.md，官方 F1 + 按类 accuracy）"
+  protocol: memory_session_transfer
+  version: "0.2.0"
+
+agent:
+  runtime: hermes                   # ★ 执行 agent：Hermes（Harbor agents/installed/hermes.py）
+  model: anthropic/DeepSeek-V4-Flash  # anthropic 前缀 = hermes 走 Anthropic 协议（绕开 oneapi 的 OpenAI tools 校验 bug）
+  setup_timeout_sec: 900
+
+memory:
+  name: hermes-builtin-locomo
+  type: hermes_builtin              # ★ Hermes 官方内置 memory（MEMORY.md + USER.md）
+  path: results/memory/hermes-builtin-locomo   # host 侧 memories 目录（对应 $HERMES_HOME/memories）
+  config:
+    targets: [memory, user]         # 启用 MEMORY.md + USER.md
+    memory_limit: 2200              # MEMORY.md 字符上限（与 Hermes 默认一致）
+    user_limit: 1375                # USER.md 字符上限（与 Hermes 默认一致）
+
+task:
+  # ★ benchmark 声明：sessions 由 LoCoMo 适配器 build_tasks 生成（覆盖下面占位）
+  benchmark: locomo
+  benchmark_options:
+    subset: 1                     # 只取 1 个对话
+    max_questions: 3              # 只取前 3 题（smoke test 用小数据）
+  data:
+    type: local
+    name: locomo
+  sessions:
+    # 占位（协议要求 >=2 session）；实际运行时由 benchmark 适配器生成
+    - instruction: "（由 benchmark 适配器生成）"
+      placeholder: true
+    - instruction: "（由 benchmark 适配器生成）"
+      placeholder: true
+  memory_ground_truth: ""
+
+judging:
+  type: llm_judge
+  prompt: task_success
+  model: DeepSeek-V4-Flash        # 本机模型（oneapi 网关；Responses 不兼容时自动回退 chat completions）
+  base_url: ${ANTHROPIC_BASE_URL}
+  api_key_env: ANTHROPIC_AUTH_TOKEN
+
+execution:
+  engine: harbor                     # mock（验证编排）/ harbor（真实隔离执行）
+  n_concurrent: 4                    # ★ 跨 task 并行度（task 内 session 因 memory 依赖恒串行）
+  environment:
+    type: docker
+    force_build: false               # 复用预构建镜像（hermes 已装好，跳过重装）
+    docker_image: dumeval-hermes:latest   # ★ 预装 Hermes v0.20.5 + uv（Dockerfile 从零构建）
+    env:
+      ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL}
+
+output:
+  dir: results
+  tasks_dir: tasks_generated

@@ -1,0 +1,99 @@
+"""目录型 Memory 适配器：内存型 memory 统一为目录语义。
+
+适用场景：
+- Claude Code 内置 memory（CLAUDE.md / auto-memory 目录）
+- 外挂本地目录型 memory 插件
+
+设计要点：
+- host 侧维护 memory 目录（`spec.path`），inject 时声明为挂载（见 base.declare_mount）
+- Quality 观测 = 分析目录内容（对比 ground truth）+ 记录注入/快照操作
+- 跨 session 保留 = 目录不销毁，session 间快照
+"""
+
+from __future__ import annotations
+
+import shutil
+from pathlib import Path
+from typing import Any
+
+from ..models import EvalTask, MemoryOp, MemorySpec, SessionSpec
+from .base import BaseMemoryAdapter, declare_mount
+from .registry import register_adapter
+
+# agent 环境内的 memory 目录（与 lifecycle.memory_transfer 的传递目标一致）
+CONTAINER_MEMORY_DIR = "/app/memory"
+
+
+@register_adapter
+class DirectoryMemoryAdapter(BaseMemoryAdapter):
+    """目录型 memory 后端。"""
+
+    type_name = "directory"
+
+    def __init__(self, spec: MemorySpec) -> None:
+        super().__init__(spec)
+        # 路径在构造时绑定：resume 跳过 setup（setup 会清空目录）时仍能 read_memory_files
+        self.memory_dir = Path(spec.path) if spec.path else Path("results") / "memory" / spec.name
+
+    def setup(self, task: EvalTask) -> None:
+        self.memory_dir.mkdir(parents=True, exist_ok=True)
+        # 清空重建，保证干净起点（上一次 run 的残留会污染 Quality）
+        if any(self.memory_dir.iterdir()):
+            for item in self.memory_dir.iterdir():
+                if item.is_dir():
+                    shutil.rmtree(item)
+                else:
+                    item.unlink()
+        self._ops.clear()
+        self._record("setup", 0)
+
+    def inject(self, session: SessionSpec, session_ctx: dict[str, Any]) -> None:
+        """把 memory 目录声明为 agent 环境内的挂载。
+
+        之前的实现依赖 ``session_ctx["agent_memory_target"]``，但没有任何执行器
+        设置该键——注入永远静默跳过。现在统一走 ``memory_mounts`` 契约，
+        执行器（Harbor bind mount / Mock 清单）都会消费。
+        """
+        self.memory_dir.mkdir(parents=True, exist_ok=True)
+        declare_mount(session_ctx, self.memory_dir, CONTAINER_MEMORY_DIR)
+        env = session_ctx.setdefault("agent_env", {})
+        env["DUMEMEVAL_MEMORY_DIR"] = CONTAINER_MEMORY_DIR
+        n_items = len(list(self.memory_dir.iterdir()))
+        self._record(
+            "inject",
+            session.id,
+            content=f"mount {self.memory_dir} -> {CONTAINER_MEMORY_DIR}（{n_items} 项）",
+        )
+
+    def memory_usage_hint(self) -> str | None:
+        return f"持久记忆目录：{CONTAINER_MEMORY_DIR}（env DUMEMEVAL_MEMORY_DIR）"
+
+    def snapshot(self, session: SessionSpec, snapshot_dir: Path) -> Path:
+        """快照 memory 目录到 snapshot_dir/session_{id}/。"""
+        snap = snapshot_dir / f"session_{session.id}"
+        snap.mkdir(parents=True, exist_ok=True)
+        for item in self.memory_dir.iterdir():
+            dst = snap / item.name
+            if item.is_dir():
+                shutil.copytree(item, dst, dirs_exist_ok=True)
+            else:
+                shutil.copy2(item, dst)
+        self._record("snapshot", session.id, content=str(snap))
+        return snap
+
+    def observe(self, session: SessionSpec) -> list[MemoryOp]:
+        """目录型：返回本 session 期间记录的 ops。"""
+        return [op for op in self._ops if op.session_id == session.id]
+
+    def read_memory_files(self) -> dict[str, str]:
+        """读取 memory 目录全部文件内容（Quality 评测用）。"""
+        import contextlib
+
+        result: dict[str, str] = {}
+        if not self.memory_dir.exists():
+            return result
+        for path in sorted(self.memory_dir.rglob("*")):
+            if path.is_file():
+                with contextlib.suppress(OSError):
+                    result[str(path.relative_to(self.memory_dir))] = path.read_text()
+        return result

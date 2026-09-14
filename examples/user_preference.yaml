@@ -1,0 +1,66 @@
+# DuMemEval 示例评测配置
+# 任务：用户偏好记忆 —— 2 个 session，跨 session memory 传递
+
+experiment:
+  name: user-preference-memory
+  description: "用户偏好记忆：session1 告诉 agent 偏好，session2 应用偏好"
+  protocol: memory_session_transfer   # ★ 核心协议：session 间 memory 传递
+  version: "0.2.0"
+
+agent:
+  runtime: claude-code
+  model: DeepSeek-V4-Flash[1M]        # BYOK 网关模型
+  setup_timeout_sec: 900
+
+memory:
+  name: directory-demo
+  type: directory
+  path: results/memory/directory-demo
+
+task:
+  sessions:
+    - instruction: |
+        用户 Alice 告诉你她的偏好：
+        - 咖啡只喝拿铁，不加糖
+        - 喜欢靠窗的位置
+        - 出差时只住四星级以上酒店
+        请把这些偏好记住。
+      memory_inject: true
+    - instruction: |
+        为 Alice 预订出差酒店。她有一些长期偏好，请应用它们。
+        选择一个合适的酒店并说明理由。
+      memory_inject: true
+      verifier:
+        type: rule
+        ground_truth: "latte"
+  memory_ground_truth: |
+    Alice 的咖啡偏好是拿铁且不加糖
+    Alice 喜欢靠窗的位置
+    Alice 出差时只住四星级以上酒店
+  task_ground_truth: "agent 应用了 Alice 的至少一个偏好"
+
+judging:
+  # 主路径：LLM as judge（语义判分）；rule 仅用于 mock 快速验证/结构化场景
+  type: llm_judge
+  prompt: memory_quality
+  model: DeepSeek-V4-Flash
+  base_url: ${ANTHROPIC_BASE_URL}
+  api_key_env: ANTHROPIC_AUTH_TOKEN
+
+execution:
+  engine: mock                        # mock（验证编排）/ harbor（真实隔离执行）
+  trials: 1
+  environment:
+    type: docker
+    env:
+      ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL}
+    mounts:
+      - type: bind
+        source: /Users/yueqi/Coding/Agent/Memroy/Eval/dumemeval/results/memory/directory-demo
+        target: /app/memory
+
+output:
+  dir: results
+  tasks_dir: tasks_generated

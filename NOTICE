@@ -1,0 +1,56 @@
+DuMemEval
+Copyright 2026 DuMemEval Contributors
+
+This product includes software developed at the DuMemEval project
+(Apache License 2.0, see LICENSE).
+
+--------------------------------------------------------------------------------
+Third-party evaluation datasets
+--------------------------------------------------------------------------------
+
+This repository redistributes **small smoke subsets** of third-party datasets under
+`data/smoke/` (see `data/smoke/README.md` for provenance and per-file license):
+
+- `data/smoke/locomo_smoke.json` — Adapted Material from LoCoMo
+  (snap-research/locomo, https://github.com/snap-research/locomo),
+  released under CC BY-NC 4.0 (see LICENSE.txt in that repo).
+  Source: https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json
+- `data/smoke/shopping_smoke.jsonl` — sample 0, first 2 rounds, of MemoryArena
+  bundled_shopping (ZexueHe/memoryarena, https://huggingface.co/datasets/ZexueHe/memoryarena),
+  license as declared on that dataset page.
+
+These subsets keep the official format (only truncated/sampled) and are intended
+for verifying that the evaluation pipeline runs (smoke); their scores carry no
+research meaning. They are NOT covered by this project's Apache-2.0 license.
+
+Full datasets are NOT redistributed. Adapters under
+`src/dumemeval/datasets/benchmarks/` read data that users obtain themselves from
+the upstream sources listed in each adapter's module docstring (`Source:` /
+`Paper:` lines), or download to a local cache with `dumemeval prepare`. Each
+dataset remains under its own license and terms.
+
+Verify the declared sources with:
+
+    rg -n "^Source:|^Paper:" src/dumemeval/datasets/benchmarks/*.py
+
+`examples/data/locomo_mini.json` is an original example authored for this
+project (LoCoMo-compatible format, synthetic content). It is covered by this
+project's Apache-2.0 license and is intended only for verifying that an
+installation runs; its scores carry no research meaning.
+
+--------------------------------------------------------------------------------
+Metric parity references
+--------------------------------------------------------------------------------
+
+Metric calculators under `src/dumemeval/metrics/` reimplement official scoring
+from upstream benchmarks so that reported numbers are comparable. Each
+calculator's docstring names the upstream file/function it mirrors. Where
+upstream evaluation code is unpublished, the docstring states that the metric is
+this project's own definition rather than an official mirror.
+
+--------------------------------------------------------------------------------
+Optional dependencies
+--------------------------------------------------------------------------------
+
+Harbor (optional extra `harbor`) provides the isolated execution engine and is
+installed from PyPI at the user's discretion. It is not vendored here.

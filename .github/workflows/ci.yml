@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    # 仓库默认分支是 master；同时听 main 以防未来迁移默认分支
+    branches: [master, main]
+  pull_request:
+
+permissions:
+  # 最小权限：测试只读代码，无需写
+  contents: read
+
+concurrency:
+  # 同一 ref（PR 或分支）的新 push 取消旧 run，避免排队浪费
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Sync dependencies
+        run: uv sync --extra dev
+
+      - name: Lint (ruff)
+        run: uv run ruff check src/ tests/
+
+      - name: Format check (ruff format)
+        run: uv run ruff format --check src/ tests/
+
+      - name: Type check (mypy)
+        run: uv run mypy
+
+      - name: Test (pytest)
+        run: uv run pytest tests/ -m "not e2e"
+
+      - name: Build package
+        run: uv build
+
+      - name: Mock smoke (example, zero external deps)
+        run: uv run python -m dumemeval run --config examples/locomo_mini.yaml --mock --no-resume
+
+      - name: Bundled smoke data builds (zero download, mock)
+        env:
+          # 仅用于通过配置里的 ${ENV} 模板校验；mock 模式走规则判分 + MockRunner，
+          # 不会触达真实 LLM / 网络（数据为仓库捆绑子集，零下载）
+          ANTHROPIC_AUTH_TOKEN: ci-mock-dummy
+          ANTHROPIC_BASE_URL: https://example.invalid
+          ANTHROPIC_MODEL: ci-mock-dummy
+        run: uv run python -m dumemeval run --config configs/smoke/locomo_transfer.yaml --mock --no-resume

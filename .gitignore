@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# 评测输出（不提交）
+results/
+trials/
+tasks_generated/
+*.log
+
+# 工具
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# agent 临时 worktree（子代理隔离副本，不入库）
+.claude/worktrees/
+
+# pre-commit
+.pre-commit-cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store

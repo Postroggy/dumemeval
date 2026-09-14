@@ -1,0 +1,86 @@
+[
+  {
+    "sample_id": "example_conv_0",
+    "conversation": {
+      "speaker_a": "Alice",
+      "speaker_b": "Bob",
+      "session_1_date_time": "3 May 2026",
+      "session_1": [
+        {
+          "speaker": "Alice",
+          "dia_id": "D1:1",
+          "text": "I finally moved into the new apartment in Portland last weekend."
+        },
+        {
+          "speaker": "Bob",
+          "dia_id": "D1:2",
+          "text": "Congrats! How is the neighbourhood?"
+        },
+        {
+          "speaker": "Alice",
+          "dia_id": "D1:3",
+          "text": "Quiet, and there is a roastery downstairs. I go every morning for an oat latte."
+        },
+        {
+          "speaker": "Bob",
+          "dia_id": "D1:4",
+          "text": "Nice. Still avoiding sugar in your coffee?"
+        },
+        {
+          "speaker": "Alice",
+          "dia_id": "D1:5",
+          "text": "Always. Oat milk, no sugar, that is the only way I drink it."
+        }
+      ],
+      "session_2_date_time": "17 May 2026",
+      "session_2": [
+        {
+          "speaker": "Bob",
+          "dia_id": "D2:1",
+          "text": "Did you end up adopting the cat you mentioned?"
+        },
+        {
+          "speaker": "Alice",
+          "dia_id": "D2:2",
+          "text": "Yes! Her name is Mochi, a grey tabby. Adopted her two weeks after I moved in."
+        },
+        {
+          "speaker": "Bob",
+          "dia_id": "D2:3",
+          "text": "Does she let you work?"
+        },
+        {
+          "speaker": "Alice",
+          "dia_id": "D2:4",
+          "text": "She sits on the keyboard every afternoon around three."
+        }
+      ]
+    },
+    "qa": [
+      {
+        "question": "What city did Alice move to?",
+        "answer": "Portland",
+        "evidence": ["D1:1"],
+        "category": 4
+      },
+      {
+        "question": "How does Alice take her coffee?",
+        "answer": "oat milk, no sugar",
+        "evidence": ["D1:5"],
+        "category": 4
+      },
+      {
+        "question": "What is the name of Alice's cat?",
+        "answer": "Mochi",
+        "evidence": ["D2:2"],
+        "category": 4
+      },
+      {
+        "question": "When did Alice adopt her cat relative to moving in?",
+        "answer": "two weeks after moving in",
+        "evidence": ["D1:1", "D2:2"],
+        "category": 2
+      }
+    ]
+  }
+]

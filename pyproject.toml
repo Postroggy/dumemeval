@@ -1,0 +1,92 @@
+[project]
+name = "dumemeval"
+version = "0.2.0"
+description = "DuMemEval: agent-first memory evaluation — measure memory-augmented agents, not just memory backends"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+authors = [{ name = "DuMemEval Team" }]
+keywords = ["memory", "agent", "evaluation", "benchmark", "llm"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "pydantic>=2.11",
+    "pyyaml>=6.0",
+    "requests>=2.32",
+    "nltk>=3.10.3",
+    "pyarrow>=17.0",
+    "datasets>=3.0",
+    "tiktoken>=0.14.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "ruff>=0.9",
+    "mypy>=1.14",
+    "pre-commit>=4.0",
+]
+hf = ["datasets>=3.0"]
+judge = ["openai>=1.60", "anthropic>=0.40"]
+# Harbor 真实隔离执行（可选）；mock / 贡献 adapter / 加数据集不需要。
+harbor = ["harbor>=0.22.0"]
+
+[project.scripts]
+dumemeval = "dumemeval.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.8.4,<0.9.0"]
+build-backend = "uv_build"
+
+# ── uv 配置 ─────────────────────────────────────────────────────────────────
+[tool.uv]
+package = true
+
+# ── ruff 配置 ───────────────────────────────────────────────────────────────
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF"]
+ignore = [
+    "E501",  # 行宽交给 formatter
+    "RUF001",  # 中文提示语的全角标点（：（）是正常用法
+    "RUF002",  # 中文 docstring 的全角标点（：（）是正常用法
+    "RUF003",  # 中文注释的全角标点（：（）是正常用法
+]
+
+# ── pytest 配置（严格 markers：未注册 marker 直接失败）─────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = ["-v", "--tb=short", "--strict-markers", "--strict-config"]
+markers = [
+    "unit: 单元测试（快速，无外部依赖）",
+    "integration: 集成测试（需要 Harbor/docker/外部服务）",
+    "e2e: 端到端测试（需要真实 agent + BYOK 环境）",
+]
+asyncio_mode = "auto"
+
+# ── mypy 配置 ───────────────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.12"
+files = ["src", "tests"]
+mypy_path = "src"
+ignore_missing_imports = true
+strict = true
+warn_unused_configs = true
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.2",
+    "pytest-cov>=7.1.0",
+]
