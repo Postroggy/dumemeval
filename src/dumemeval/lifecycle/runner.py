@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from ..adapters.base import BaseMemoryAdapter
+from ..core.instructions import instruction_digest
 from ..core.protocol import EvalProtocol, MemorySessionTransferProtocol
 from ..execution.executor import SessionExecutor, SessionOutcome
 from ..models import EvalTask, TaskExecution
@@ -91,6 +92,10 @@ class SessionRunner:
                 await self.hooks.emit(LifecycleEvent.ERROR, session, session_ctx)
             outcome.query = session.query
             session_outcomes.append(outcome)
+            if outcome.instruction_sha256 is None:
+                outcome.instruction_sha256 = instruction_digest(
+                    session.instruction, str(session_ctx.get("instruction_suffix") or "")
+                )
 
             trial_dir = session_ctx.pop("trial_dir", None)
             if trial_dir is not None:

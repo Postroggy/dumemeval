@@ -118,8 +118,10 @@ def snapshot_run(
     provenance.runtime_versions = runtime_versions()
     if tasks is not None:
         provenance.controls = experiment_controls(cfg, tasks)
+        observed = observed_controls(out)
+        provenance.controls["observed_prompts"] = observed["observed_prompts"]
         if any(t.task_environment.get("type") == "memoryarena" for t in tasks):
-            provenance.controls.update(observed_controls(out))
+            provenance.controls.update(observed)
     payload = {
         "provenance": provenance.model_dump(),
         "config": redact_config(cfg.model_dump()),

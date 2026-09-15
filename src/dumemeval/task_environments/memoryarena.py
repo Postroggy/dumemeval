@@ -52,9 +52,14 @@ class ArenaClient:
         self._require_active()
         return self._request("tool", {"tool": name, "arguments": arguments}).get("result")
 
-    def shopping_task(self, row: dict[str, JsonValue], output_path: str) -> None:
+    def shopping_task(
+        self, row: dict[str, JsonValue], output_path: str, *, step_index: int | None = None
+    ) -> None:
         """Use the upstream task reconstruction before initializing WebShop."""
-        self._request("shopping_task", {"row": row, "output_path": output_path})
+        payload: dict[str, JsonValue] = {"row": row, "output_path": output_path}
+        if step_index is not None:
+            payload["step_index"] = step_index
+        self._request("shopping_task", payload)
 
     def initialize(self) -> None:
         if self._initialized or self._closed or self._ambiguous:

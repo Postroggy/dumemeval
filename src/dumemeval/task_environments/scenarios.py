@@ -23,6 +23,7 @@ class ToolResult(BaseModel):
 
 class ArenaScenario(ABC):
     seed_policy = "deterministic_initial_state"
+    reset_per_session = False
 
     def __init__(self, task: EvalTask, config: ArenaRuntimeConfig, directory: Path) -> None:
         self.task, self.config, self.directory = task, config, directory
@@ -33,6 +34,10 @@ class ArenaScenario(ABC):
 
     def reset_seed(self) -> int:
         return self.config.seed
+
+    def prepare_session(self, client: ArenaClient, session: SessionSpec) -> None:
+        """Prepare a scene-defined episode without changing the memory lifecycle."""
+        return None
 
     def validate_reset(self, evidence: EnvironmentEvidence) -> None:
         """Validate any environment-selected task data against the pinned input."""
@@ -122,6 +127,7 @@ class SearchScenario(ArenaScenario):
 
 class ShoppingScenario(ArenaScenario):
     seed_policy = "upstream_wall_clock_seed"
+    reset_per_session = True
 
     def __init__(self, task: EvalTask, config: ArenaRuntimeConfig, directory: Path) -> None:
         super().__init__(task, config, directory)
@@ -129,7 +135,11 @@ class ShoppingScenario(ArenaScenario):
 
     def prepare(self, client: ArenaClient) -> None:
         self.upstream.start()
-        path = self.directory.resolve() / "official-task.json"
+
+    def prepare_session(self, client: ArenaClient, session: SessionSpec) -> None:
+        rounds = [item for item in self.task.sessions if item.query is not None]
+        index = next(i for i, item in enumerate(rounds) if item.id == session.id)
+        path = self.directory.resolve() / f"official-task-{session.id}.json"
         row = cast(
             dict[str, JsonValue],
             _JSON.validate_python(
@@ -141,7 +151,7 @@ class ShoppingScenario(ArenaScenario):
                 }
             ),
         )
-        client.shopping_task(row, str(path))
+        client.shopping_task(row, str(path), step_index=index)
         client.config.env_config.update(
             task_file=str(path),
             reuse_env=False,
@@ -165,7 +175,9 @@ class ShoppingScenario(ArenaScenario):
         return ToolResult(result=public, evidence=evidence)
 
     def submit(self, client: ArenaClient, session: SessionSpec, answer: str) -> EnvironmentEvidence:
-        return client.observation()
+        evidence = client.observation()
+        evidence.info["episode_scope"] = "session"
+        return evidence
 
     def close(self) -> None:
         self.upstream.close()

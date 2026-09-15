@@ -212,7 +212,7 @@ def test_shopping_exact_purchase_rule_matches_official(official_root: Path, purc
         "WebShopEnvironment",
     )
     env = SimpleNamespace(
-        task_def={"target_products": ["B000000001", "B000000002"]},
+        task_def={"target_products": ["B000000002"]},
         _get_client=lambda: SimpleNamespace(purchased_asins=purchased),
     )
     env._normalize_expected_asins = lambda gold: methods["_normalize_expected_asins"](env, gold)
@@ -221,5 +221,89 @@ def test_shopping_exact_purchase_rule_matches_official(official_root: Path, purc
     last = inp.execution.sessions[-1].environment
     assert last is not None
     last.info["purchased_asins"] = list(purchased)
+    last.info["episode_scope"] = "session"
     result = MemoryArenaShoppingCalculator().calculate(inp)
     assert result.details[-1]["match_ground_truth"] == official["match_ground_truth"]
+
+
+@pytest.mark.parametrize(
+    "purchases", [["B000000099", "B000000002"], [None, "B000000002"], ["B000000001", "B000000002"]]
+)
+def test_shopping_per_product_and_bundle_match_official_runner(
+    official_root: Path, purchases: list[str | None]
+) -> None:
+    from dumemeval.metrics.benchmarks.memoryarena_shopping import MemoryArenaShoppingCalculator
+    from tests.test_memoryarena_contracts import shopping_input
+
+    official = definitions(
+        official_root / "env/env_systems/web_shopping_env/runtime/runner/summary_build.py",
+        {"hydrate_step_summary"},
+    )
+    official.update(get_product_name_from_catalog=lambda asin: asin, format_feedback=lambda *args: "")
+    enrich = definitions(official_root / "run_shopping.py", {"enrich_task_result"})["enrich_task_result"]
+    inp = shopping_input(evidence=True)
+    steps = []
+    for index, purchased in enumerate(purchases):
+        evidence = inp.execution.sessions[index].environment
+        assert evidence is not None
+        evidence.task_id = f"episode-{index}"
+        evidence.info.update(
+            episode_scope="session", purchased_asins=[] if purchased is None else [purchased]
+        )
+        steps.append(
+            official["hydrate_step_summary"](
+                {"purchased_asin": purchased, "match_ground_truth": None if purchased else False},
+                inp.task.data["answers"][index],
+                index + 1,
+            )
+        )
+    expected = enrich({"steps": steps, "total_steps": 2})
+    actual = MemoryArenaShoppingCalculator().calculate(inp)
+    assert [d["match_ground_truth"] for d in actual.details] == [s["match_ground_truth"] for s in steps]
+    assert actual.values["match_ground_truth"] == expected["matched_steps"] / 2
+    assert actual.values["overall_success"] == expected["overall_success"]
+
+
+def test_shopping_split_task_http_uses_official_task_builder(official_root: Path, tmp_path: Path) -> None:
+    import copy
+
+    from dumemeval.models.environment import ArenaConnection, ArenaRuntimeConfig
+    from dumemeval.task_environments.memoryarena import ArenaClient
+    from dumemeval.task_environments.service import OfficialService
+    from tests.test_memoryarena_contracts import raw_case
+
+    row = raw_case("shopping")[0]
+    row["questions"] = ["Rules\nProduct 1:\nBuy a base.", "Rules\nProduct 2:\nBuy an attachment."]
+    official = definitions(
+        official_root / "env/env_systems/web_shopping_env/runtime/runner/task_files.py",
+        {
+            "_reconstruct_task_def_from_hf_row",
+            "split_agent_instruction",
+            "build_instruction_for_step",
+            "build_single_step_task",
+        },
+    )
+    official["copy"] = copy
+    full = official["_reconstruct_task_def_from_hf_row"](row)
+    prefix, sections = official["split_agent_instruction"](full["agent_instruction"])
+    service = OfficialService(
+        ArenaRuntimeConfig(reference=official_root, env_name="webshop"), tmp_path / "service"
+    )
+    try:
+        service.start()
+        client = ArenaClient(ArenaConnection(base_url=service.url, env_name="webshop"))
+        try:
+            for index in range(2):
+                path = tmp_path / f"step-{index}.json"
+                client.shopping_task(row, str(path), step_index=index)
+                instruction = official["build_instruction_for_step"](
+                    prefix, sections, index + 1, {}, include_history=False
+                )
+                expected = official["build_single_step_task"](full, index, instruction)
+                assert json.loads(path.read_text(encoding="utf-8")) == expected
+                assert expected["target_products"] == [row["answers"][index]["target_asin"]]
+                assert expected["global_constraints"]["max_steps"] == 1
+        finally:
+            client.close()
+    finally:
+        service.close()

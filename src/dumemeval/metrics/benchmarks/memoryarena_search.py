@@ -78,6 +78,10 @@ class MemoryArenaSearchCalculator(MetricCalculator):
             score_status="measured",
             official_score=float(correct),
             judge_observation=parsed.get("raw"),
+            judge_observations=parsed.get("observations", []),
+            judge_runs=parsed.get("runs", 1),
+            judge_score=parsed.get("score", float(correct)),
+            judge_aggregation="majority_vote" if parsed.get("runs", 1) > 1 else "single",
         )
         bundle.values["accuracy"] = float(correct)
         if parsed.get("confidence") is not None:
@@ -112,7 +116,30 @@ class MemoryArenaSearchCalculator(MetricCalculator):
         except Exception as exc:
             return {"score_status": "not_measured", "judge_error": f"{type(exc).__name__}: {exc}"}
         if verdict.label == "SKIPPED":
-            return {"score_status": "not_measured", "judge_error": verdict.reason, "raw": verdict.raw}
+            return {
+                "score_status": "not_measured",
+                "judge_error": verdict.reason,
+                "judge_observations": [
+                    {"raw": raw, "score": score}
+                    for raw, score in zip(verdict.run_raws, verdict.run_scores, strict=True)
+                ],
+                "judge_runs": len(verdict.run_raws),
+            }
         from ...verifier.parsers import parse_judge_response
 
-        return {**parse_judge_response(verdict.raw), "raw": verdict.raw}
+        observations = [
+            {**parse_judge_response(raw), "raw": raw, "score": score}
+            for raw, score in zip(
+                verdict.run_raws or [verdict.raw], verdict.run_scores or [verdict.score], strict=True
+            )
+        ]
+        confidences = [item["confidence"] for item in observations if item["confidence"] is not None]
+        return {
+            "correct": verdict.label == "yes" if verdict.runs > 1 else observations[0]["correct"],
+            "parse_error": any(item["parse_error"] for item in observations),
+            "confidence": sum(confidences) / len(confidences) if confidences else None,
+            "raw": verdict.raw,
+            "observations": observations,
+            "runs": verdict.runs,
+            "score": verdict.score,
+        }

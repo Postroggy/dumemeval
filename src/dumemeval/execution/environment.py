@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
 
+from ..core.instructions import instruction_digest
 from ..environments import get_task_environment
 from ..models import EvalTask, SessionOutcome, SessionSpec, TaskEnvSpec
 from ..task_environments.base import TaskEnvironmentRuntime
@@ -88,4 +89,8 @@ class EnvironmentExecutor(SessionExecutor):
                     outcome.error = (
                         outcome.error or ""
                     ) + f"; environment finalization failed: {type(exc).__name__}"
+        if outcome.instruction_sha256 is None:
+            outcome.instruction_sha256 = instruction_digest(
+                session.instruction, str(context.get("instruction_suffix") or "")
+            )
         return outcome

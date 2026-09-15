@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import re
@@ -55,6 +56,7 @@ class HarborBridge(SessionExecutor):
         )
         try:
             outcome = await self._run_session(session, session_ctx)
+            outcome.instruction_sha256 = session_ctx.get("instruction_sha256")
             return SessionOutcome.model_validate_json(redactor.text(outcome.model_dump_json()))
         finally:
             task_name = sanitize_task_name(str(session_ctx.get("task_name") or "task"))
@@ -89,6 +91,9 @@ class HarborBridge(SessionExecutor):
         task_dir = self.task_dir_generator.generate(
             session, task_name=task_name, instruction_suffix=str(session_ctx.get("instruction_suffix") or "")
         )
+        session_ctx["instruction_sha256"] = hashlib.sha256(
+            (task_dir / "instruction.md").read_bytes()
+        ).hexdigest()
 
         # 从 session_ctx 读 memory 注入目标（SessionRunner 的 MemoryTransfer 已注入）
         memory_dir = session_ctx.get("agent_memory_dir")

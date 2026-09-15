@@ -138,12 +138,16 @@ class LLMJudgeVerifier(BaseVerifier):
                 )
                 verdicts.append(self._parse_raw(raw))
             verdict = aggregate_verdicts(verdicts) if len(verdicts) > 1 else verdicts[0]
+            if not verdict.run_raws:
+                verdict.run_raws = [item.raw for item in verdicts]
         except Exception as exc:
             if self.skip_failed:
                 return Verdict(
                     label="SKIPPED",
                     score=0.0,
                     reason=str(exc),
+                    run_raws=[item.raw for item in verdicts],
+                    run_scores=[item.score for item in verdicts],
                     model_input=user_prompt if self.save_model_input else None,
                 )
             raise

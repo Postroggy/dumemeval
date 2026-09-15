@@ -34,6 +34,7 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
         self.service = OfficialService(config, self.directory)
         self.scenario = SCENARIOS[config.env_name](task, config, self.directory)
         self.client: ArenaClient | None = None
+        self._clients: list[ArenaClient] = []
         self.gateway: ToolGateway | None = None
         self.session: SessionSpec | None = None
         self.evidence: list[EnvironmentEvidence] = []
@@ -62,6 +63,7 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
                 timeout_sec=self.config.timeout_sec,
             )
         )
+        self._clients.append(self.client)
         deadline = time.monotonic() + self.config.startup_timeout_sec
         while True:
             try:
@@ -72,19 +74,40 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
                     raise
                 time.sleep(0.1)
         self.scenario.prepare(self.client)
-        self.client.initialize()
-        seed = self.scenario.reset_seed()
-        self.evidence.append(self.client.reset(seed=seed))
-        self._reset_seed = seed
-        self.scenario.validate_reset(self.evidence[-1])
-        self.catalog = self.client.tools()
+        if not self.scenario.reset_per_session:
+            self._initialize_episode()
         self.gateway = ToolGateway(self.config.gateway_host, self._call, self.config.max_actions)
         self.gateway.start()
         self._write_artifacts()
 
+    def _initialize_episode(self, session_id: int | None = None) -> None:
+        assert self.client is not None
+        self.client.initialize()
+        seed = self.scenario.reset_seed()
+        reset = self.client.reset(seed=seed)
+        reset.session_id = session_id
+        reset.sequence = len(self.evidence)
+        self.evidence.append(reset)
+        self._reset_seed = seed
+        self.scenario.validate_reset(self.evidence[-1])
+        self.catalog = self.client.tools()
+
     def begin_session(self, session: SessionSpec) -> EnvironmentBinding:
         if self.gateway is None or self.client is None or self._closed:
             raise RuntimeError("Task environment is not open")
+        if self.scenario.reset_per_session:
+            self.client.close()
+            self.client = ArenaClient(
+                ArenaConnection(
+                    base_url=self.service.url,
+                    env_name=self.config.env_name,
+                    env_config=dict(self.config.env_config),
+                    timeout_sec=self.config.timeout_sec,
+                )
+            )
+            self._clients.append(self.client)
+            self.scenario.prepare_session(self.client, session)
+            self._initialize_episode(session.id)
         self.session = session
         self._submitted = False
         token = self.gateway.bind()
@@ -215,7 +238,7 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
             "task_id": self.task.name,
             "environment_id": self.client.task_id if self.client else None,
             "evidence": [e.model_dump() for e in self.evidence],
-            "lifecycle": [e.model_dump() for e in self.client.events] if self.client else [],
+            "lifecycle": [e.model_dump() for client in self._clients for e in client.events],
             "closed": self._closed,
         }
         runtime = {
@@ -223,7 +246,7 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
             "seed": self._reset_seed,
             "seed_policy": self.scenario.seed_policy,
             "env_name": self.config.env_name,
-            "environment_state": "per_task",
+            "environment_state": "per_session" if self.scenario.reset_per_session else "per_task",
             "conversation_state": "per_session",
             "closed": self._closed,
             "cleanup_status": self._cleanup_status,

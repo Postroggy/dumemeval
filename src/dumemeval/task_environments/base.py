@@ -23,11 +23,11 @@ class TaskEnvironmentRuntime(ABC):
 
     @abstractmethod
     def open(self) -> None:
-        """Prepare services, verify readiness, initialize and reset once."""
+        """Prepare owned services and the scenario's initial environment state."""
 
     @abstractmethod
     def begin_session(self, session: SessionSpec) -> EnvironmentBinding:
-        """Issue a fresh session capability without resetting the environment."""
+        """Apply the scenario's episode boundary and issue a fresh capability."""
 
     @abstractmethod
     def finish_session(self, session: SessionSpec, outcome: SessionOutcome) -> SessionOutcome:

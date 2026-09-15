@@ -126,6 +126,8 @@ rg -n "^Source:|^Paper:" src/dumemeval/datasets/benchmarks/*.py
 
 MemoryArena 另有 [Hermes 真实 on/off 与记忆通道验证](memoryarena-hermes.md)，
 含固定版本复现入口、原生轨迹与脱敏证据包。
+Shopping 逐商品边界、实际提示/技能指纹和 Search 多次判分的当前修复见
+[PR #5 审查反例与回归](memoryarena-review-fixes.md)。
 
 ## 未完成
 

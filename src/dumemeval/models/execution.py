@@ -19,6 +19,9 @@ class SessionOutcome(BaseModel):
     success: bool = False
     reward: float = 0.0
     observation: str = ""
+    instruction_sha256: str | None = Field(
+        default=None, description="Hash of the instruction at the executor boundary"
+    )
     artifacts: dict[str, Path] = Field(default_factory=dict)
     error: str | None = None
     environment: EnvironmentEvidence | None = Field(

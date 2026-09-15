@@ -112,7 +112,9 @@ def comparability_warnings(runs: list[RunRef]) -> list[str]:
 
     fingerprints = [ref.provenance.controls if ref.provenance else {} for ref in runs]
     if any("not-observed" in fields.values() for fields in fingerprints):
-        warnings.append("Actual agent/environment evidence is missing; runtime comparability is unverified")
+        warnings.append(
+            "Actual agent/environment/prompt/skill evidence is missing; runtime comparability is unverified"
+        )
     if any("not-controlled" in fields.values() for fields in fingerprints):
         warnings.append("Upstream environment randomness is not controlled; seed equivalence is unverified")
     if any(not fields for fields in fingerprints):

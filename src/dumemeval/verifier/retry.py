@@ -44,4 +44,5 @@ def aggregate_verdicts(verdicts: list[Verdict]) -> Verdict:
         raw=verdicts[-1].raw,
         runs=len(verdicts),
         run_scores=scores,
+        run_raws=[item.raw for item in verdicts],
     )

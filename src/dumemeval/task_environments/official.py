@@ -31,6 +31,7 @@ class ShoppingTaskRequest(BaseModel):
     task_id: str
     row: dict[str, Any]
     output_path: str
+    step_index: int | None = Field(default=None, ge=0)
 
 
 def configure_factory(factory: Callable[..., Any]) -> Callable[..., Any]:
@@ -81,6 +82,12 @@ def main() -> None:
     def shopping_task(request: ShoppingTaskRequest) -> dict[str, Any]:
         module = importlib.import_module("env.env_systems.web_shopping_env.runtime.runner.task_files")
         task = module._reconstruct_task_def_from_hf_row(request.row)
+        if request.step_index is not None:
+            prefix, sections = module.split_agent_instruction(task["agent_instruction"])
+            instruction = module.build_instruction_for_step(
+                prefix, sections, request.step_index + 1, {}, include_history=False
+            )
+            task = module.build_single_step_task(task, request.step_index, instruction)
         Path(request.output_path).write_text(json.dumps(task), encoding="utf-8")
         return {"status": "ok", "task_id": request.task_id}
 
