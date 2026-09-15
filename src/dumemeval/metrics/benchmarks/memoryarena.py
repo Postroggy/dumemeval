@@ -13,7 +13,14 @@ import difflib
 import re
 from typing import Any, ClassVar, Literal
 
-from ..core.base import MetricBundle, MetricCalculator, MetricInput, MetricKind, round_items
+from ..core.base import (
+    MetricBundle,
+    MetricCalculator,
+    MetricInput,
+    MetricKind,
+    outcome_for_round,
+    round_items,
+)
 
 SLOTS = [
     "current_city",
@@ -57,7 +64,9 @@ def parse_person_plan(result_text: str, name: str) -> list[dict[str, Any]]:
     if name:
         pattern = rf"===\s*{re.escape(name)}'s Plan\s*===(.*?)(?====|$)"
         match = re.search(pattern, result_text, re.DOTALL)
-        plan_text = match.group(1).strip() if match else result_text
+        if not match:
+            return []
+        plan_text = match.group(1).strip()
     else:
         plan_text = result_text
     days: list[dict[str, Any]] = []
@@ -200,8 +209,18 @@ class MemoryArenaTravelCalculator(MetricCalculator):
         n = 0
         for idx, question, query, gt, pred in round_items(inp):
             n += 1
+            outcome = outcome_for_round(inp, idx)
+            evidence = outcome.environment if outcome else None
+            managed = inp.task.task_environment.get("type") == "memoryarena"
+            if (managed and (evidence is None or evidence.reward is None)) or (
+                outcome and not outcome.success
+            ):
+                details.append({"round_idx": idx, "score_status": "not_measured", "official_score": None})
+                continue
             name = question.get("name", "") if isinstance(question, dict) else ""
             judged = judge_round(pred, gt, name=name, judgement_mode=mode)
+            if evidence and evidence.env_name == "travel_planner" and evidence.reward is not None:
+                judged["success"] = bool(evidence.reward)
             if judged["success"]:
                 successes += 1
             slot_scores.append(float(judged["slot_accuracy"]))
@@ -213,13 +232,19 @@ class MemoryArenaTravelCalculator(MetricCalculator):
                     "slot_accuracy": judged["slot_accuracy"],
                     "judgement_mode": judged["judgement_mode"],
                     "judgement": judged["judgement"],
+                    "score_status": "measured",
+                    "official_score": float(judged["success"]),
                 }
             )
 
-        values = {
-            "round_success": successes / n if n else 0.0,
-            "slot_accuracy": sum(slot_scores) / len(slot_scores) if slot_scores else 0.0,
-        }
+        values = (
+            {
+                "round_success": successes / n if n else 0.0,
+                "slot_accuracy": sum(slot_scores) / len(slot_scores) if slot_scores else 0.0,
+            }
+            if n and all(d["score_status"] == "measured" for d in details)
+            else {}
+        )
         return MetricBundle(
             name=self.name,
             kind=self.kind,

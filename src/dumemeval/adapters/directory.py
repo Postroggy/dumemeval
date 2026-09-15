@@ -12,11 +12,15 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+import posixpath
 import shutil
-from pathlib import Path
+import time
+from pathlib import Path, PurePosixPath
 from typing import Any
 
-from ..models import EvalTask, MemoryOp, MemorySpec, SessionSpec
+from ..models import EvalTask, MemoryOp, MemorySpec, SessionOutcome, SessionSpec
 from .base import BaseMemoryAdapter, declare_mount
 from .registry import register_adapter
 
@@ -34,6 +38,8 @@ class DirectoryMemoryAdapter(BaseMemoryAdapter):
         super().__init__(spec)
         # 路径在构造时绑定：resume 跳过 setup（setup 会清空目录）时仍能 read_memory_files
         self.memory_dir = Path(spec.path) if spec.path else Path("results") / "memory" / spec.name
+        self._before: dict[str, str] = {}
+        self._observed: set[int] = set()
 
     def setup(self, task: EvalTask) -> None:
         self.memory_dir.mkdir(parents=True, exist_ok=True)
@@ -45,6 +51,7 @@ class DirectoryMemoryAdapter(BaseMemoryAdapter):
                 else:
                     item.unlink()
         self._ops.clear()
+        self._observed.clear()
         self._record("setup", 0)
 
     def inject(self, session: SessionSpec, session_ctx: dict[str, Any]) -> None:
@@ -55,6 +62,7 @@ class DirectoryMemoryAdapter(BaseMemoryAdapter):
         执行器（Harbor bind mount / Mock 清单）都会消费。
         """
         self.memory_dir.mkdir(parents=True, exist_ok=True)
+        self._before = self._file_hashes()
         declare_mount(session_ctx, self.memory_dir, CONTAINER_MEMORY_DIR)
         env = session_ctx.setdefault("agent_env", {})
         env["DUMEMEVAL_MEMORY_DIR"] = CONTAINER_MEMORY_DIR
@@ -84,6 +92,108 @@ class DirectoryMemoryAdapter(BaseMemoryAdapter):
     def observe(self, session: SessionSpec) -> list[MemoryOp]:
         """目录型：返回本 session 期间记录的 ops。"""
         return [op for op in self._ops if op.session_id == session.id]
+
+    def _file_hashes(self) -> dict[str, str]:
+        hashes = {}
+        for path in sorted(self.memory_dir.rglob("*")):
+            if path.is_file() and not path.is_symlink():
+                with path.open("rb") as handle:
+                    hashes[path.relative_to(self.memory_dir).as_posix()] = hashlib.file_digest(
+                        handle, "sha256"
+                    ).hexdigest()
+        return hashes
+
+    def observe_execution(self, session: SessionSpec, outcome: SessionOutcome) -> None:
+        """Record changed files and successful structured reads, without replaying tools.
+
+        Changes are a lower bound on writes: multiple writes to one file collapse,
+        and write-then-restore is invisible. Shell commands are deliberately not parsed.
+        """
+        if session.id in self._observed:
+            return
+        self._observed.add(session.id)
+        try:
+            after = self._file_hashes()
+        except OSError:
+            self._record("observation_unavailable", session.id, "Could not hash memory files")
+        else:
+            for name in sorted(self._before.keys() | after.keys()):
+                old, new = self._before.get(name), after.get(name)
+                if old == new:
+                    continue
+                self._ops.append(
+                    MemoryOp(
+                        session_id=session.id,
+                        op="remove" if new is None else "replace" if old is not None else "add",
+                        timestamp=time.time(),
+                        source="file_hash_change",
+                        evidence={"path": name, "before_sha256": old, "after_sha256": new},
+                    )
+                )
+        if outcome.trial_dir:
+            try:
+                self._observe_reads(session, Path(outcome.trial_dir) / "agent/trajectory.json")
+            except (AttributeError, TypeError):
+                self._record("observation_unavailable", session.id, "Unsupported trajectory structure")
+
+    def _observe_reads(self, session: SessionSpec, path: Path) -> None:
+        try:
+            trajectory = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        if not isinstance(trajectory, dict) or not isinstance(trajectory.get("steps"), list):
+            return
+        seen: set[str] = set()
+        for step in trajectory["steps"]:
+            if not isinstance(step, dict) or step.get("source") != "agent":
+                continue
+            results = (step.get("observation") or {}).get("results", [])
+            for call in step.get("tool_calls") or []:
+                call_id = call.get("tool_call_id")
+                if call.get("function_name") != "Read" or not call_id or call_id in seen:
+                    continue
+                target = self._memory_path((call.get("arguments") or {}).get("file_path"))
+                if target is None:
+                    continue
+                for result in results:
+                    if result.get("source_call_id") != call_id:
+                        continue
+                    metadata = (result.get("extra") or {}).get("tool_result_metadata") or {}
+                    raw = metadata.get("raw_tool_result") or {}
+                    payload = metadata.get("tool_use_result") or {}
+                    file = payload.get("file") or {}
+                    if (
+                        raw.get("is_error")
+                        or payload.get("type") != "text"
+                        or "content" not in file
+                        or self._memory_path(file.get("filePath")) != target
+                    ):
+                        continue
+                    self._ops.append(
+                        MemoryOp(
+                            session_id=session.id,
+                            op="retrieve",
+                            timestamp=time.time(),
+                            source="atif_read_result",
+                            evidence={
+                                "path": target,
+                                "tool_call_id": call_id,
+                                "trajectory": str(path),
+                                "observed_at": step.get("timestamp"),
+                            },
+                        )
+                    )
+                    seen.add(call_id)
+                    break
+
+    @staticmethod
+    def _memory_path(value: Any) -> str | None:
+        if not isinstance(value, str):
+            return None
+        path = PurePosixPath(posixpath.normpath(value))
+        if not path.is_relative_to(CONTAINER_MEMORY_DIR) or str(path) == CONTAINER_MEMORY_DIR:
+            return None
+        return path.relative_to(CONTAINER_MEMORY_DIR).as_posix()
 
     def read_memory_files(self) -> dict[str, str]:
         """读取 memory 目录全部文件内容（Quality 评测用）。"""

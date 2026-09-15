@@ -1,0 +1,47 @@
+# Synthetic persistence probe, separate from benchmark scores.
+agent:
+  model: gpt-5.5(medium)
+  runtime: claude-code
+  version: 2.1.89
+execution:
+  engine: harbor
+  environment:
+    env:
+      ANTHROPIC_AUTH_TOKEN: ${DUMEMEVAL_PROXY_KEY}
+      ANTHROPIC_BASE_URL: http://host.docker.internal:8317
+      ANTHROPIC_MODEL: gpt-5.5(medium)
+      CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1'
+      CLAUDE_CONFIG_DIR: /tmp/dumemeval-claude
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: gpt-5.5(medium)
+      ANTHROPIC_DEFAULT_SONNET_MODEL: gpt-5.5(medium)
+      ANTHROPIC_DEFAULT_OPUS_MODEL: gpt-5.5(medium)
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+    type: docker
+    docker_image: ${MEMORYARENA_SMOKE_IMAGE:-dumemeval-claude:2.1.89-smoke-20260915}
+    force_build: false
+    agent_timeout_sec: 300
+  n_concurrent: 1
+  resume: false
+experiment:
+  name: memoryarena-memory-canary
+  description: Synthetic file-transfer diagnostic; not a benchmark score.
+  protocol: memory_session_transfer
+judging:
+  type: rule
+memory:
+  name: memory-canary
+  type: directory
+  path: results/memoryarena/${MEMORYARENA_CANARY_RUN:-cliproxy-memory-canary}/persistent
+output:
+  dir: results/memoryarena/${MEMORYARENA_CANARY_RUN:-cliproxy-memory-canary}
+  tasks_dir: tasks_generated/memoryarena/${MEMORYARENA_CANARY_RUN:-cliproxy-memory-canary}
+task:
+  memory_instruction: location
+  sessions:
+  - instruction: This is a file persistence diagnostic. Use Python to generate a fresh
+      UUID and write it as UTF-8 text to /app/memory/transfer-canary.txt. Read the
+      file once to verify the write. Reply only WRITE_OK. Do not use any automatic
+      memory system.
+  - instruction: This is a new isolated session. Use a file or Bash tool to read /app/memory/transfer-canary.txt
+      saved by the previous session. Do not create, replace, or infer the file contents.
+      Reply only MEMORY_READ=<the exact UUID read from that file>.

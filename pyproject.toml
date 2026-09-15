@@ -35,6 +35,8 @@ hf = ["datasets>=3.0"]
 judge = ["openai>=1.60", "anthropic>=0.40"]
 # Harbor 真实隔离执行（可选）；mock / 贡献 adapter / 加数据集不需要。
 harbor = ["harbor>=0.22.0"]
+# Pinned upstream calls messages.create(temperature=...), removed in Anthropic 1.x.
+memoryarena = ["fastapi>=0.109", "uvicorn>=0.27", "anthropic>=0.40,<1"]
 
 [project.scripts]
 dumemeval = "dumemeval.cli:main"

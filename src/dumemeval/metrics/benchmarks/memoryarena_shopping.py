@@ -7,7 +7,7 @@
 - web_shopping_env/compute_reward.py：ASIN 精确匹配时 reward=1.0；
   否则 ``compute_attribute_matches``（--no-llm 字符串子串，normalize_for_match）
 
-本计算器在 AgentOutput 文本上抽取 ASIN，再套上述官方判定。
+本计算器仅使用 host 采集的 environment evidence；提及 ASIN 不代表购买。
 不把 travel 的 slot / round_success 套到购物任务上。
 """
 
@@ -21,7 +21,6 @@ from ..core.base import (
     MetricCalculator,
     MetricInput,
     MetricKind,
-    round_items,
 )
 
 # Amazon ASIN：样本如 B00TUDFEW2 / B08957C9ZH
@@ -79,7 +78,7 @@ def normalize_expected_asins(ground_truth: Any) -> list[str]:
 
 
 def score_shopping_round(pred: str, ground_truth: Any) -> dict[str, Any]:
-    """单回合：官方 exact ASIN match + 官方 attribute 字符串匹配。"""
+    """Legacy text diagnostic only; this is not environment-verified shopping scoring."""
     expected = normalize_expected_asins(ground_truth)
     attributes: list[str] = []
     if isinstance(ground_truth, dict):
@@ -103,7 +102,7 @@ def score_shopping_round(pred: str, ground_truth: Any) -> dict[str, Any]:
 
 
 class MemoryArenaShoppingCalculator(MetricCalculator):
-    """bundled_shopping：match_ground_truth / overall_success / attribute_match。"""
+    """Score cumulative purchased ASINs; absent evidence leaves official values unset."""
 
     name: ClassVar[str] = "memoryarena_shopping"
     kind: ClassVar[MetricKind] = "benchmark"
@@ -111,24 +110,55 @@ class MemoryArenaShoppingCalculator(MetricCalculator):
 
     def calculate(self, inp: MetricInput) -> MetricBundle:
         details: list[dict[str, Any]] = []
-        exact_flags: list[float] = []
-        attr_scores: list[float] = []
-        n = 0
-        for idx, _question, query, gold, pred in round_items(inp):
-            n += 1
-            scored = score_shopping_round(pred, gold)
-            exact_flags.append(1.0 if scored["match_ground_truth"] else 0.0)
-            attr_scores.append(float(scored["attribute_match"]))
-            details.append({"round_idx": idx, "query": query, **scored})
+        answers = inp.task.data.get("answers", [])
+        sessions = [session for session in inp.task.sessions if session.query is not None]
+        outcomes = {outcome.session_id: outcome for outcome in inp.execution.sessions}
+        expected: list[str] = []
+        flags: list[float] = []
+        for idx, session in enumerate(sessions):
+            gold = answers[idx] if idx < len(answers) else None
+            round_expected = normalize_expected_asins(gold)
+            expected.extend(round_expected)
+            outcome = outcomes.get(session.id)
+            evidence = outcome.environment if outcome else None
+            detail: dict[str, Any] = {
+                "round_idx": idx,
+                "query": session.query,
+                "session_id": session.id,
+                "execution_status": "completed" if outcome and outcome.success else "not_completed",
+                "score_status": "not_measured",
+                "official_score": None,
+            }
+            if evidence and evidence.env_name == "webshop" and outcome and outcome.success and round_expected:
+                purchases = evidence.info.get("purchased_asins")
+                observed_purchases = evidence.observation.get("purchases")
+                if purchases is None and isinstance(observed_purchases, list):
+                    purchases = [
+                        purchase.get("asin") for purchase in observed_purchases if isinstance(purchase, dict)
+                    ]
+                if isinstance(purchases, list) and all(isinstance(asin, str) for asin in purchases):
+                    purchased = [str(asin).upper() for asin in purchases]
+                    correct = purchased == expected
+                    flags.append(float(correct))
+                    detail.update(
+                        score_status="measured",
+                        official_score=float(correct),
+                        match_ground_truth=correct,
+                        purchased_asins=purchased,
+                        expected_asins=list(expected),
+                        environment_task_id=evidence.task_id,
+                    )
+            details.append(detail)
 
-        overall = 1.0 if exact_flags and all(flag == 1.0 for flag in exact_flags) else 0.0
+        values: dict[str, float] = {}
+        if sessions and len(flags) == len(sessions):
+            values["match_ground_truth"] = sum(flags) / len(flags)
+            # A truncated sample is not a completed official bundle.
+            if len(sessions) == inp.task.data.get("source_round_count", len(sessions)):
+                values["overall_success"] = float(all(flags))
         return MetricBundle(
             name=self.name,
             kind=self.kind,
-            values={
-                "match_ground_truth": sum(exact_flags) / n if n else 0.0,
-                "overall_success": overall,
-                "attribute_match": sum(attr_scores) / len(attr_scores) if attr_scores else 0.0,
-            },
+            values=values,
             details=details,
         )

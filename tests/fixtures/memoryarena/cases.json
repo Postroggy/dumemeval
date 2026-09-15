@@ -1,0 +1,7 @@
+{
+  "shopping": [{"id": 37, "category": "synthetic", "questions": ["Buy the base.", "Buy a compatible attachment."], "answers": [{"target_asin": "B000000001", "attributes": ["base"]}, {"target_asin": "B000000002", "attributes": ["attachment"]}]}],
+  "travel": [{"id": 37, "base_person": {"name": "Mira", "query": "I am Mira.\nI prefer trains.", "daily_plans": [{"days": 1, "current_city": "Alpha", "transportation": "Train T1"}]}, "questions": ["I am Bob.\nJoin Mira in Alpha.", "I am Cy.\nUse Bob's plan."], "answers": [[{"days": 1, "current_city": "Alpha", "transportation": "Train T1"}], [{"days": 1, "current_city": "Alpha", "transportation": "Train T1"}]]}],
+  "search": [{"id": 37, "questions": ["Who founded the group?", "Where did the founder work next?"], "answers": ["Ada", "Alpha"]}],
+  "math": [{"id": 37, "paper_name": "synthetic-math", "questions": ["Find x.", "Find y using x."], "answers": ["2", "4"], "backgrounds": ["x + 1 = 3", "y = 2x"]}],
+  "phys": [{"id": 37, "paper_name": "synthetic-phys", "questions": ["Find v.", "Find the energy using v."], "answers": ["2", "2"], "backgrounds": ["v = d/t; d = 4; t = 2", "E = mv^2/2; m = 1"]}]
+}

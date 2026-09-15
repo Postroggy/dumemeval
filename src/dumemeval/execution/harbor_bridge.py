@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -41,7 +42,26 @@ class HarborBridge(SessionExecutor):
         self.config = config or HarborConfig()
         self.task_dir_generator = task_dir_generator
 
-    async def run_session(
+    async def run_session(self, session: SessionSpec, session_ctx: dict[str, Any]) -> SessionOutcome:
+        from ..artifacts.redaction import Redactor
+
+        redactor = Redactor(
+            {
+                **os.environ,
+                **self.config.environment.env,
+                **session_ctx.get("agent_env", {}),
+                **session.env_extra,
+            }
+        )
+        try:
+            outcome = await self._run_session(session, session_ctx)
+            return SessionOutcome.model_validate_json(redactor.text(outcome.model_dump_json()))
+        finally:
+            task_name = sanitize_task_name(str(session_ctx.get("task_name") or "task"))
+            trial_dir = Path(self.config.trials_dir) / f"dumemeval_{task_name}__session_{session.id}"
+            redactor.tree(trial_dir)
+
+    async def _run_session(
         self,
         session: SessionSpec,
         session_ctx: dict[str, Any],
@@ -79,8 +99,12 @@ class HarborBridge(SessionExecutor):
                 type="bind",
                 source=str(Path(mount.host_path).resolve()),
                 target=mount.container_path,
+                read_only=mount.read_only,
             )
-            for mount in session_ctx.get("memory_mounts") or []
+            for mount in [
+                *(session_ctx.get("memory_mounts") or []),
+                *(session_ctx.get("runtime_mounts") or []),
+            ]
         ]
 
         agent_env = dict(session_ctx.get("agent_env") or {})
@@ -112,7 +136,6 @@ class HarborBridge(SessionExecutor):
             observation = self._extract_agent_output(trial_dir)
             if observation:
                 outcome.observation = observation
-                outcome.success = True
             if trial_dir is not None:
                 session_ctx["trial_dir"] = trial_dir
             outcome.artifacts = self._collect_artifacts(session, trial_dir)
@@ -137,9 +160,12 @@ class HarborBridge(SessionExecutor):
         未声明 artifacts 或目录不存在时返回空 dict。
         """
         artifacts: dict[str, Path] = {}
-        if not session.artifacts or trial_dir is None:
+        if trial_dir is None:
             return artifacts
         agent_dir = trial_dir / "agent"
+        trajectory = agent_dir / "trajectory.json"
+        if trajectory.is_file():
+            artifacts["agent_trajectory"] = trajectory
         if not agent_dir.exists():
             return artifacts
         for name in session.artifacts:
@@ -199,7 +225,7 @@ class HarborBridge(SessionExecutor):
 
         is_success = getattr(verifier_result, "is_success", None) if verifier_result else None
         if is_success is not None:
-            outcome.success = bool(is_success)
+            outcome.success = exc is None and bool(is_success)
         else:
             outcome.success = exc is None and bool(outcome.observation)
 

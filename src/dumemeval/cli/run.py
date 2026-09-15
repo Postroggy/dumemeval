@@ -28,7 +28,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     results, adapters = _run_tasks(cfg, tasks, args)
     _finalize(cfg, tasks, results, adapters, args)
-    return 0
+    return 0 if all(result.status == "completed" for result in results) else 1
 
 
 def _preflight(cfg: ExperimentConfig, args: argparse.Namespace) -> None:
@@ -106,12 +106,18 @@ def _finalize(
     n_concurrent = max(1, min(args.n_concurrent or cfg.execution.n_concurrent, len(tasks)))
     output_dir = args.output or cfg.output.dir
     used_mock = args.mock or cfg.execution.engine == "mock"
+    from ..artifacts.redaction import Redactor
+
+    redactor = Redactor({**os.environ, **cfg.execution.environment.env})
+    for category in ("trials", "snapshots", "memory", "environments", "checkpoints"):
+        redactor.tree(Path(output_dir) / category)
     provenance = snapshot_run(
         cfg,
         output_dir=output_dir,
         config_path=args.config,
         mock=used_mock,
         n_concurrent=n_concurrent,
+        tasks=tasks,
     )
     summary = finalize_run(
         cfg,
@@ -177,9 +183,9 @@ def _build_tasks(cfg: ExperimentConfig) -> list[EvalTask]:
         task.memory_instruction = cfg.task.memory_instruction
         if task_environment:
             merged = dict(task.task_environment or {})
+            cfg_config = dict(merged.get("config") or {})
             merged.update({k: v for k, v in task_environment.items() if v is not None})
             if isinstance(task_environment.get("config"), dict) or isinstance(merged.get("config"), dict):
-                cfg_config = dict(merged.get("config") or {})
                 cfg_config.update(dict(task_environment.get("config") or {}))
                 merged["config"] = cfg_config
             task.task_environment = merged
@@ -220,18 +226,18 @@ def _to_memory_spec(cfg: ExperimentConfig, task_suffix: str | None = None) -> Me
 
 
 def build_executor(cfg: ExperimentConfig, *, mock: bool, output_dir: str) -> SessionExecutor:
-    """构建执行器（--mock 优先，其次 execution.engine；Harbor 缺失时回退 mock）。"""
+    """构建执行器；真实运行缺少 Harbor 时立即失败，mock 必须显式选择。"""
     if mock or cfg.execution.engine == "mock":
         from ..execution.mock import MockRunner
 
         return MockRunner()
 
     if not harbor_available():
-        print("⚠️  Harbor 未安装，回退到 MockRunner。安装: uv sync --extra harbor")
-        from ..execution.mock import MockRunner
+        raise RuntimeError(
+            "Harbor is unavailable. Install with uv sync --extra harbor, or explicitly use --mock"
+        )
 
-        return MockRunner()
-
+    from ..execution.environment import EnvironmentExecutor
     from ..execution.harbor_bridge import HarborBridge
     from ..execution.task_dir import TaskDirGenerator
     from ..execution.trial_config import (
@@ -242,28 +248,31 @@ def build_executor(cfg: ExperimentConfig, *, mock: bool, output_dir: str) -> Ses
     )
 
     env_spec = cfg.execution.environment
-    return HarborBridge(
-        config=HarborConfig(
-            trials_dir=str(Path(output_dir) / "trials"),
-            agent=HarborAgentConfig(
-                name=cfg.agent.runtime,
-                model=cfg.agent.model,
-                setup_timeout_sec=cfg.agent.setup_timeout_sec,
-                temperature=cfg.agent.temperature,
-                max_tokens=cfg.agent.max_tokens,
-                skills_dir=str(Path(cfg.agent.skills_dir).expanduser().resolve())
-                if cfg.agent.skills_dir
-                else None,
+    return EnvironmentExecutor(
+        HarborBridge(
+            config=HarborConfig(
+                trials_dir=str(Path(output_dir) / "trials"),
+                agent=HarborAgentConfig(
+                    name=cfg.agent.runtime,
+                    version=cfg.agent.version,
+                    model=cfg.agent.model,
+                    setup_timeout_sec=cfg.agent.setup_timeout_sec,
+                    temperature=cfg.agent.temperature,
+                    max_tokens=cfg.agent.max_tokens,
+                    skills_dir=str(Path(cfg.agent.skills_dir).expanduser().resolve())
+                    if cfg.agent.skills_dir
+                    else None,
+                ),
+                environment=HarborEnvironmentConfig(
+                    type=env_spec.type,
+                    force_build=env_spec.force_build,
+                    docker_image=env_spec.docker_image,
+                    env=env_spec.env,
+                    mounts=[MountConfig.model_validate(m.model_dump()) for m in env_spec.mounts],
+                ),
             ),
-            environment=HarborEnvironmentConfig(
-                type=env_spec.type,
-                force_build=env_spec.force_build,
-                docker_image=env_spec.docker_image,
-                env=env_spec.env,
-                mounts=[MountConfig.model_validate(m.model_dump()) for m in env_spec.mounts],
-            ),
-        ),
-        task_dir_generator=TaskDirGenerator(tasks_root=cfg.output.tasks_dir, env_spec=env_spec),
+            task_dir_generator=TaskDirGenerator(tasks_root=cfg.output.tasks_dir, env_spec=env_spec),
+        )
     )
 
 
@@ -305,7 +314,7 @@ def _print_summary(summary: RunSummary, results: list[TaskExecution], *, used_mo
         print("      指标仅用于验证编排链路，不代表 agent 真实水平。")
     elif results and all(not (session.observation or "").strip() for r in results for session in r.sessions):
         print("   ⚠️  所有 session 的 agent 输出为空（未采集到 trajectory.json），")
-        print("      依赖输出的 benchmark 指标会算 0 分，请检查 agent 是否正常运行。")
+        print("      缺少 agent 输出，相关指标不能视为有效测量；请检查 agent 是否正常运行。")
 
     for warning in summary.warnings:
         print(f"   ⚠️  {warning}")

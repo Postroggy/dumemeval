@@ -13,8 +13,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from functools import cache
+from pathlib import Path
 
-from .models import TaskEnvSpec
+from .models import EvalTask, TaskEnvSpec
+from .task_environments.base import TaskEnvironmentRuntime
 
 __all__ = [
     "HttpTaskEnvironment",
@@ -31,6 +33,12 @@ class TaskEnvironmentProvider(ABC):
     """任务环境 provider 契约。子类设置 ``name`` 并实现三个方法。"""
 
     name: str = ""
+
+    def create_runtime(
+        self, task: EvalTask, spec: TaskEnvSpec, output_dir: Path
+    ) -> TaskEnvironmentRuntime | None:
+        """Optionally own a task runtime; endpoint-only providers remain compatible."""
+        return None
 
     @abstractmethod
     def endpoint(self, spec: TaskEnvSpec) -> str | None:
@@ -118,11 +126,39 @@ _PROVIDER_REGISTRY: dict[str, type[TaskEnvironmentProvider]] = {
 }
 
 
+class MemoryArenaTaskEnvironment(TaskEnvironmentProvider):
+    """Managed official MemoryArena tools, registered through the existing boundary.
+
+    Source: https://github.com/ZexueHe/MemoryArena
+    """
+
+    name = "memoryarena"
+
+    def endpoint(self, spec: TaskEnvSpec) -> str | None:
+        return None
+
+    def usage_hint(self, spec: TaskEnvSpec) -> str | None:
+        return None
+
+    def env_vars(self, spec: TaskEnvSpec) -> dict[str, str]:
+        return {}
+
+    def create_runtime(self, task: EvalTask, spec: TaskEnvSpec, output_dir: Path) -> TaskEnvironmentRuntime:
+        from .models.environment import ArenaRuntimeConfig
+        from .task_environments.runtime import MemoryArenaRuntime
+
+        return MemoryArenaRuntime(task, ArenaRuntimeConfig.model_validate(spec.config), output_dir)
+
+
+_PROVIDER_REGISTRY[MemoryArenaTaskEnvironment.name] = MemoryArenaTaskEnvironment
+
+
 def register_task_environment(cls: type[TaskEnvironmentProvider]) -> type[TaskEnvironmentProvider]:
     """注册环境 provider（扩展点）。"""
     if not getattr(cls, "name", None):
         raise ValueError(f"{cls.__name__} must set ClassVar name")
     _PROVIDER_REGISTRY[cls.name] = cls
+    _provider_instance.cache_clear()
     return cls
 
 

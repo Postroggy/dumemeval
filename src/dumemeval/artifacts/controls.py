@@ -1,0 +1,99 @@
+"""Stable, secret-free fingerprints for the inputs of a controlled experiment."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+
+from ..core.config import ExperimentConfig
+from ..models import EvalTask
+from .redaction import redact_config
+
+
+def digest(value: object) -> str:
+    return hashlib.sha256(
+        json.dumps(value, sort_keys=True, ensure_ascii=False, default=str).encode()
+    ).hexdigest()
+
+
+def runtime_versions() -> dict[str, str]:
+    packages = {}
+    for package in ("dumemeval", "harbor", "anthropic", "openai", "datasets", "pydantic"):
+        try:
+            packages[package] = version(package)
+        except PackageNotFoundError:
+            packages[package] = "not-installed"
+    return packages
+
+
+def experiment_controls(cfg: ExperimentConfig, tasks: list[EvalTask]) -> dict[str, str]:
+    source = Path(__file__).resolve().parents[1]
+    files = {
+        str(path.relative_to(source)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(source.rglob("*.py"))
+    }
+    return {
+        name: digest(value)
+        for name, value in {
+            "tasks": [
+                {
+                    "name": t.name,
+                    "data": t.data,
+                    "sessions": [
+                        {"id": s.id, "query": s.query, "instruction": s.instruction} for s in t.sessions
+                    ],
+                }
+                for t in tasks
+            ],
+            "dataset": cfg.task.data.model_dump() if cfg.task.data else {},
+            "agent": redact_config(cfg.agent.model_dump()),
+            "judge": redact_config(cfg.judging.model_dump()),
+            "runtime": {
+                "engine": cfg.execution.engine,
+                "environment": redact_config(cfg.execution.environment.model_dump()),
+                "packages": runtime_versions(),
+            },
+            "task_environment": [redact_config(t.task_environment) for t in tasks],
+            "code": files,
+        }.items()
+    }
+
+
+def observed_controls(output_dir: Path) -> dict[str, str]:
+    """Fingerprint observed implementations without ephemeral ports or task handles."""
+    environments = []
+    for path in sorted((output_dir / "environments").glob("*/runtime.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        environments.append(
+            {
+                key: data.get(key)
+                for key in (
+                    "revision",
+                    "environment_source_sha256",
+                    "env_name",
+                    "seed",
+                    "seed_policy",
+                    "python",
+                    "fastapi",
+                    "uvicorn",
+                    "assets",
+                    "packages",
+                )
+            }
+        )
+    agents = []
+    for path in sorted((output_dir / "trials").glob("*/agent/trajectory.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        agent = data.get("agent") or {}
+        agents.append({key: agent.get(key) for key in ("name", "version", "model_name")})
+    return {
+        "observed_environment": digest(environments) if environments else "not-observed",
+        "observed_agent": digest(agents) if agents else "not-observed",
+        **(
+            {"environment_seed": "not-controlled"}
+            if any(item.get("seed_policy") == "upstream_wall_clock_seed" for item in environments)
+            else {}
+        ),
+    }

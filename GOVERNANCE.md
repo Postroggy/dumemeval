@@ -88,6 +88,10 @@ flowchart BT
 
 ## 指标语义（勿过度解读）
 
+- **MemoryArena Shopping**：正式分数要求 host 采集的环境购买记录；没有记录时为未测，
+  不再从 agent 文本提及的 ASIN 推导购买成功。截断样本不报告完整 bundle 的 overall_success。
+  接入状态与剩余工作见 [MemoryArena 设计](docs/datasets/memoryarena.md)。
+
 - **Quality.precision**：当前是「含任一 GT fact 的 memory 文件占比」，不是 HaluMem 论文那种逐条标注 precision。
 - **Quality.update_accuracy**：未实现时为 `None`（报告 n/a），不是 0。
 - **Utility.memory_conditioned_gain**：需要对照基线（`test_only` vs 有 memory）；单次评测经常为 0。

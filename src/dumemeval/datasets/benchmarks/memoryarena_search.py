@@ -17,6 +17,7 @@ from ...metrics.benchmarks.locomo import JudgeFn
 from ...models import EvalTask, SessionSpec
 from ..benchmark import BenchmarkAdapter, BenchmarkData, register_benchmark
 from ._common import query_text
+from ._memoryarena import take, validate_ids, validate_rounds
 
 
 class SearchSample(BaseModel):
@@ -30,7 +31,11 @@ class MemoryArenaSearchData(BenchmarkData):
 
     @classmethod
     def from_raw(cls, raw: Any) -> MemoryArenaSearchData:
-        return cls(samples=[SearchSample.model_validate(item) for item in raw])
+        samples = [SearchSample.model_validate(item) for item in raw]
+        validate_ids([sample.id for sample in samples])
+        for sample in samples:
+            validate_rounds(sample.questions, sample.answers)
+        return cls(samples=samples)
 
 
 @register_benchmark
@@ -44,16 +49,20 @@ class MemoryArenaSearchAdapter(BenchmarkAdapter):
     def data_type(self) -> type[BenchmarkData]:
         return MemoryArenaSearchData
 
-    def build_tasks(self, data: BenchmarkData) -> list[EvalTask]:
+    def build_tasks(
+        self, data: BenchmarkData, subset: int | None = None, max_questions: int | None = None
+    ) -> list[EvalTask]:
         if not isinstance(data, MemoryArenaSearchData):
             raise TypeError(f"Expected MemoryArenaSearchData, got {type(data)}")
         tasks: list[EvalTask] = []
-        for item in data.samples:
-            if not item.questions:
+        for item in take(data.samples, subset):
+            questions = take(item.questions, max_questions)
+            answers = take(item.answers, max_questions)
+            if not questions:
                 continue
             sessions = [
                 SessionSpec(id=i + 1, instruction=query_text(q), memory_inject=True, query=query_text(q))
-                for i, q in enumerate(item.questions)
+                for i, q in enumerate(questions)
             ]
             tasks.append(
                 EvalTask(
@@ -61,8 +70,10 @@ class MemoryArenaSearchAdapter(BenchmarkAdapter):
                     description=f"MemoryArena progressive_search {item.id}",
                     sessions=sessions,
                     data={
-                        "questions": [query_text(q) for q in item.questions],
-                        "answers": item.answers,
+                        "sample_id": item.id,
+                        "source_round_count": len(item.questions),
+                        "questions": questions,
+                        "answers": answers,
                     },
                     benchmark="memoryarena_search",
                 )

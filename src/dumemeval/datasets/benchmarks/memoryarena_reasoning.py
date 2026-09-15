@@ -20,6 +20,7 @@ from ...metrics.benchmarks.locomo import JudgeFn
 from ...models import EvalTask, SessionSpec
 from ..benchmark import BenchmarkAdapter, BenchmarkData, register_benchmark
 from ._common import query_text
+from ._memoryarena import take, validate_ids, validate_rounds
 
 
 class ReasoningSample(BaseModel):
@@ -35,7 +36,13 @@ class MemoryArenaReasoningData(BenchmarkData):
 
     @classmethod
     def from_raw(cls, raw: Any) -> MemoryArenaReasoningData:
-        return cls(samples=[ReasoningSample.model_validate(item) for item in raw])
+        samples = [ReasoningSample.model_validate(item) for item in raw]
+        validate_ids([sample.id for sample in samples])
+        for sample in samples:
+            validate_rounds(sample.questions, sample.answers)
+            if len(sample.backgrounds) != len(sample.questions):
+                raise ValueError("MemoryArena reasoning backgrounds must align with questions")
+        return cls(samples=samples)
 
 
 def _instruction(question: Any, background: Any) -> str:
@@ -54,16 +61,21 @@ class _FormalReasoningAdapter(BenchmarkAdapter):
     def data_type(self) -> type[BenchmarkData]:
         return MemoryArenaReasoningData
 
-    def build_tasks(self, data: BenchmarkData) -> list[EvalTask]:
+    def build_tasks(
+        self, data: BenchmarkData, subset: int | None = None, max_questions: int | None = None
+    ) -> list[EvalTask]:
         if not isinstance(data, MemoryArenaReasoningData):
             raise TypeError(f"Expected MemoryArenaReasoningData, got {type(data)}")
         tasks: list[EvalTask] = []
-        for item in data.samples:
-            if not item.questions:
+        for item in take(data.samples, subset):
+            questions = take(item.questions, max_questions)
+            answers = take(item.answers, max_questions)
+            backgrounds = take(item.backgrounds, max_questions)
+            if not questions:
                 continue
             sessions: list[SessionSpec] = []
-            for i, q in enumerate(item.questions):
-                bg = item.backgrounds[i] if i < len(item.backgrounds) else ""
+            for i, q in enumerate(questions):
+                bg = backgrounds[i]
                 sessions.append(
                     SessionSpec(
                         id=i + 1,
@@ -78,9 +90,11 @@ class _FormalReasoningAdapter(BenchmarkAdapter):
                     description=f"{self.name} paper={item.paper_name}",
                     sessions=sessions,
                     data={
-                        "questions": [query_text(q) for q in item.questions],
-                        "answers": item.answers,
-                        "backgrounds": item.backgrounds,
+                        "sample_id": item.id,
+                        "source_round_count": len(item.questions),
+                        "questions": questions,
+                        "answers": answers,
+                        "backgrounds": backgrounds,
                         "paper_name": item.paper_name,
                     },
                     benchmark=self.name,

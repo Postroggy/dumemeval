@@ -171,8 +171,20 @@ class TestComparabilityWarnings:
     def test_aligned_runs_have_no_warnings(self, tmp_path: Path) -> None:
         a = _write_run(tmp_path, "a", metrics={"locomo.f1": 0.4})
         b = _write_run(tmp_path, "b", metrics={"locomo.f1": 0.6})
-        cmp_result = compare_runs([load_run(a), load_run(b)])
+        refs = [load_run(a), load_run(b)]
+        for ref in refs:
+            assert ref.provenance is not None
+            ref.provenance.controls = dict.fromkeys(
+                ("tasks", "dataset", "agent", "judge", "runtime", "task_environment", "code"), "same-fixture"
+            )
+        cmp_result = compare_runs(refs)
         assert cmp_result.warnings == []
+
+    def test_legacy_runs_without_fingerprints_are_unverified(self, tmp_path: Path) -> None:
+        a = _write_run(tmp_path, "a", metrics={"locomo.f1": 0.4})
+        b = _write_run(tmp_path, "b", metrics={"locomo.f1": 0.6})
+        warnings = compare_runs([load_run(a), load_run(b)]).warnings
+        assert any("fingerprints are missing" in warning for warning in warnings)
 
 
 class TestGuards:

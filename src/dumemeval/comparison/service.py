@@ -110,6 +110,23 @@ def comparability_warnings(runs: list[RunRef]) -> list[str]:
     """控制变量不一致时显式警告（业务据此判断这张表能不能引用）。"""
     warnings: list[str] = []
 
+    fingerprints = [ref.provenance.controls if ref.provenance else {} for ref in runs]
+    if any("not-observed" in fields.values() for fields in fingerprints):
+        warnings.append("Actual agent/environment evidence is missing; runtime comparability is unverified")
+    if any("not-controlled" in fields.values() for fields in fingerprints):
+        warnings.append("Upstream environment randomness is not controlled; seed equivalence is unverified")
+    if any(not fields for fields in fingerprints):
+        warnings.append("Controlled-input fingerprints are missing; experiment comparability is unverified")
+    else:
+        keys = set().union(*(set(fields) for fields in fingerprints))
+        for key in sorted(keys):
+            if len({fields.get(key) for fields in fingerprints}) > 1:
+                warnings.append(
+                    f"Controlled input differs: {key}; this comparison is not a controlled ablation"
+                )
+    if any(task.execution_status != "completed" for ref in runs for task in ref.summary.per_task):
+        warnings.append("Incomplete executions are present; missing measurements cannot be treated as zero")
+
     mocked = [ref.label for ref in runs if _is_mock(ref)]
     if mocked:
         warnings.append(f"mock run 参与比较（{', '.join(mocked)}）：整表不可引用为实验结果")

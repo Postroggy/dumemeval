@@ -55,6 +55,7 @@ def call_with_retries[T](
     max_retries: int = 3,
     sleep_fn: Callable[[float], None] | None = None,
     base_delay: float = 0.5,
+    retry_if: Callable[[BaseException], bool] = is_retryable,
 ) -> T:
     """最多尝试 ``max_retries`` 次（``max_retries=0`` 视为 1 次，不退避）。"""
     if sleep_fn is None:
@@ -66,7 +67,7 @@ def call_with_retries[T](
             return fn()
         except Exception as exc:
             last = exc
-            if not is_retryable(exc) or index == attempts - 1:
+            if not retry_if(exc) or index == attempts - 1:
                 raise
             sleep_fn(base_delay * (2**index))
     assert last is not None

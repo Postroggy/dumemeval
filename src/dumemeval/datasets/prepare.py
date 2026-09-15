@@ -68,7 +68,7 @@ DATASET_REGISTRY: dict[str, DatasetSpec] = {
         prepare_note=(
             "这只是任务文件（目标 ASIN）。官方 webshop 商品库与 env server\n"
             "需另按 MemoryArena setup_web_shopping.md 启动（默认 :8005），\n"
-            "否则 shopping 官方 ASIN 分恒为 0——这是环境缺口，不是模型分数。"
+            "没有真实购买证据时，Shopping 官方分数保持未测。"
         ),
     ),
 }

@@ -12,9 +12,8 @@ import subprocess
 from pathlib import Path
 
 from ..core.config import ExperimentConfig
-from ..models import GitSnapshot, RunProvenance
-
-_SECRET_MARKERS = ("KEY", "SECRET", "TOKEN", "PASSWORD", "AUTH")
+from ..models import EvalTask, GitSnapshot, RunProvenance
+from .redaction import redact_config
 
 __all__ = [
     "GitSnapshot",
@@ -49,21 +48,6 @@ def derive_run_id(cfg: ExperimentConfig) -> str:
     return f"{slug}-{digest}"
 
 
-def redact_config(obj: object) -> object:
-    """递归脱敏：键名含 KEY/SECRET/TOKEN/PASSWORD/AUTH 的值改为 ***。"""
-    if isinstance(obj, dict):
-        out: dict[str, object] = {}
-        for key, value in obj.items():
-            if any(marker in str(key).upper() for marker in _SECRET_MARKERS):
-                out[str(key)] = "***"
-            else:
-                out[str(key)] = redact_config(value)
-        return out
-    if isinstance(obj, list):
-        return [redact_config(item) for item in obj]
-    return obj
-
-
 def collect_git(cwd: Path | None = None) -> GitSnapshot:
     """读当前仓库 HEAD；失败则空快照（不抛）。"""
     root = cwd or Path.cwd()
@@ -95,7 +79,7 @@ def collect_git(cwd: Path | None = None) -> GitSnapshot:
 def reproduce_command(*, config_path: str, output_dir: str, mock: bool) -> str:
     """生成可复制的 CLI 复现命令。"""
     parts = [
-        ".venv/bin/python -m dumemeval run",
+        "uv run python -m dumemeval run",
         f"--config {config_path}",
         f"--output {output_dir}",
     ]
@@ -111,6 +95,7 @@ def snapshot_run(
     config_path: str,
     mock: bool,
     n_concurrent: int = 1,
+    tasks: list[EvalTask] | None = None,
 ) -> RunProvenance:
     """落盘 ``experiment_config.json``（脱敏配置 + git + 复现命令）。"""
     out = Path(output_dir)
@@ -128,6 +113,13 @@ def snapshot_run(
         config_path=config_path,
         output_dir=str(out),
     )
+    from .controls import experiment_controls, observed_controls, runtime_versions
+
+    provenance.runtime_versions = runtime_versions()
+    if tasks is not None:
+        provenance.controls = experiment_controls(cfg, tasks)
+        if any(t.task_environment.get("type") == "memoryarena" for t in tasks):
+            provenance.controls.update(observed_controls(out))
     payload = {
         "provenance": provenance.model_dump(),
         "config": redact_config(cfg.model_dump()),

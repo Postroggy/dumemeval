@@ -17,8 +17,10 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
+from ...models import BenchmarkResult
 from ..core.base import MetricBundle, MetricCalculator, MetricInput, MetricKind, round_items
 from .locomo import JudgeFn
+from .reasoning_aggregation import aggregate_papers
 
 MATH_JUDGE_SYSTEM = "You are a helpful assistant that judges the equivalence of two mathematical expressions."
 
@@ -53,28 +55,56 @@ class MemoryArenaReasoningCalculator(MetricCalculator):
         flags: list[float] = []
         details: list[dict[str, Any]] = []
         n = 0
+        sessions = [s for s in inp.task.sessions if s.query is not None]
+        outcomes = {o.session_id: o for o in inp.outcomes}
         for idx, _question, query, gold, pred in round_items(inp):
             n += 1
             gold_text = gold if isinstance(gold, str) else str(gold)
-            correct = self._is_correct(pred, gold_text, query)
+            outcome = outcomes.get(sessions[idx].id) if idx < len(sessions) else None
+            evidence = outcome.environment if outcome else None
+            raw_judge = None
+            status = "measured"
+            if evidence and evidence.env_name in {"math", "phys"} and evidence.reward is not None:
+                correct = bool(evidence.reward)
+                raw_judge = evidence.observation.get("judge_result")
+            elif inp.task.task_environment.get("type") == "memoryarena" or (outcome and not outcome.success):
+                correct = False
+                status = "not_measured"
+            else:
+                judged = self._is_correct(pred, gold_text, query)
+                correct = bool(judged)
+                if judged is None:
+                    status = "not_measured"
             flags.append(1.0 if correct else 0.0)
             details.append(
                 {
                     "round_idx": idx,
                     "query": query,
                     "is_correct": correct,
+                    "score_status": status,
+                    "official_score": float(correct) if status == "measured" else None,
+                    "judge_observation": raw_judge,
+                    "paper_id": str(inp.task.data.get("sample_id", inp.task.name)),
                     "predicted": pred[:300],
                 }
             )
 
+        values = {}
+        if n and all(d["score_status"] == "measured" for d in details):
+            values = {"is_correct": sum(flags) / n, "avg_progress_score": sum(flags) / n}
+            if n == inp.task.data.get("source_round_count", n):
+                values["overall_average_passrate"] = flags[-1]
         return MetricBundle(
             name=self.name,
             kind=self.kind,
-            values={"is_correct": sum(flags) / n if n else 0.0},
+            values=values,
             details=details,
         )
 
-    def _is_correct(self, pred: str, gold: str, question: str) -> bool:
+    def aggregate(self, results: list[BenchmarkResult]) -> BenchmarkResult:
+        return aggregate_papers(results)
+
+    def _is_correct(self, pred: str, gold: str, question: str) -> bool | None:
         if self._judge is not None:
             return bool(self._judge(pred, gold, question))
         if not pred:
@@ -83,7 +113,8 @@ class MemoryArenaReasoningCalculator(MetricCalculator):
             from ...verifier import make_llm_judge
 
             self._llm = make_llm_judge("math_equivalence", self._llm_config)
-        return bool(self._llm.verify(pred, gold, question=question).is_pass)
+        verdict = self._llm.verify(pred, gold, question=question)
+        return None if verdict.label == "SKIPPED" else bool(verdict.is_pass)
 
 
 class MemoryArenaMathCalculator(MemoryArenaReasoningCalculator):

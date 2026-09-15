@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -82,8 +83,11 @@ class TestVerifierFactory:
 class TestResponsesFallback:
     def test_unsupported_returns_true(self) -> None:
         """API 不支持类错误 → 可回退。"""
-        assert LLMJudgeVerifier._is_responses_unsupported(Exception("404: endpoint not found"))
-        assert LLMJudgeVerifier._is_responses_unsupported(Exception("Unknown endpoint: /v1/responses"))
+        for text in ("404: endpoint not found", "Unknown endpoint: /v1/responses"):
+            error = RuntimeError(text)
+            error.response = SimpleNamespace(status_code=404)
+            assert LLMJudgeVerifier._is_responses_unsupported(error)
+        assert not LLMJudgeVerifier._is_responses_unsupported(Exception("Unknown endpoint: /v1/responses"))
 
     def test_auth_error_returns_false(self) -> None:
         """鉴权/模型错误 → 不可回退（应抛出）。"""

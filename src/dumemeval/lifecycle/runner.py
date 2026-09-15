@@ -55,10 +55,21 @@ class SessionRunner:
 
         # memory_instruction / task_environment 的 instruction 后缀（全 task 一致）
         instruction_suffix = self._compose_instruction_suffix(task, session_ctx)
+        environment_suffix = self._compose_instruction_suffix(task, session_ctx, include_memory=False)
+        environment_vars = dict(session_ctx.get("agent_env", {}))
 
         session_outcomes: list[SessionOutcome] = []
 
         for session in task.sessions:
+            # Bindings belong to one session; their backing memory survives in the adapter.
+            session_ctx["agent_env"] = dict(environment_vars)
+            session_ctx.pop("memory_mounts", None)
+            session_ctx.pop("agent_memory_dir", None)
+            # Tool access is an experiment control, independent of memory injection.
+            if environment_suffix:
+                session_ctx["instruction_suffix"] = environment_suffix
+            else:
+                session_ctx.pop("instruction_suffix", None)
             await self.hooks.emit(LifecycleEvent.SESSION_START, session, session_ctx)
 
             if self.protocol.should_inject_memory(session.memory_inject):
@@ -81,12 +92,13 @@ class SessionRunner:
             outcome.query = session.query
             session_outcomes.append(outcome)
 
-            if self.protocol.should_snapshot(session.memory_inject):
-                self.adapter.snapshot(session, self.snapshot_dir)
-
             trial_dir = session_ctx.pop("trial_dir", None)
             if trial_dir is not None:
                 outcome.trial_dir = str(trial_dir)
+            if self.protocol.should_adapter_inject(session.memory_inject):
+                self.adapter.observe_execution(session, outcome)
+            if self.protocol.should_snapshot(session.memory_inject):
+                self.adapter.snapshot(session, self.snapshot_dir)
             if trial_dir is not None and self.protocol.should_collect_memory(session.memory_inject):
                 self.memory_transfer.collect(trial_dir, session)
                 await self.hooks.emit(LifecycleEvent.MEMORY_COLLECTED, session, session_ctx)
@@ -105,22 +117,31 @@ class SessionRunner:
             sessions=session_outcomes,
             memory_ops=self.adapter.all_ops(),
             artifacts=artifacts,
+            status=(
+                "completed"
+                if all(outcome.success for outcome in session_outcomes)
+                else "partial"
+                if any(outcome.success for outcome in session_outcomes)
+                else "failed"
+            ),
         )
 
     # ── instruction 后缀组装（memory_instruction + task_environment）─────────
 
-    def _compose_instruction_suffix(self, task: EvalTask, session_ctx: dict[str, Any]) -> str:
+    def _compose_instruction_suffix(
+        self, task: EvalTask, session_ctx: dict[str, Any], *, include_memory: bool = True
+    ) -> str:
         """按模式把「memory 在哪、环境怎么用」组合成 instruction 后缀。
 
         - memory：none=不告知；location=只告知位置；proactive=位置 + 主动读写要求
         - 环境：provider 的 usage_hint（环境可交互性必须显式告知——同 memory 的教训），
           env 变量并入 agent_env（同 dict 跨 session 存续，与 adapter 注入一致）
-        只在注入 session 生效；test_only 协议下 agent 不知道 memory 存在（基线语义）。
+        环境提示独立于 memory；test_only 保留完全相同的工具使用提示。
         """
         parts: list[str] = []
 
         mode = getattr(task, "memory_instruction", "none") or "none"
-        if mode != "none":
+        if include_memory and mode != "none":
             hint = getattr(self.adapter, "memory_usage_hint", lambda: None)()
             if hint:
                 if mode == "location":

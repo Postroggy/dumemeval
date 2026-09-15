@@ -15,7 +15,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, ClassVar
 
-from ..models import EvalTask, MemoryMount, MemoryOp, MemoryOpName, MemorySpec, SessionSpec
+from ..models import EvalTask, MemoryMount, MemoryOp, MemoryOpName, MemorySpec, SessionOutcome, SessionSpec
 
 # session_ctx 里的注入通道键名（执行器消费）
 MEMORY_MOUNTS_KEY = "memory_mounts"
@@ -76,6 +76,10 @@ class BaseMemoryAdapter(ABC):
     @abstractmethod
     def observe(self, session: SessionSpec) -> list[MemoryOp]:
         """观测该 session 期间发生的 memory 读写。"""
+
+    def observe_execution(self, session: SessionSpec, outcome: SessionOutcome) -> None:
+        """Collect optional runtime evidence after a session; existing adapters need no hook."""
+        return None
 
     def seed_history(self, task: EvalTask) -> None:
         """评测前注入历史对话（可选覆写；默认 no-op）。

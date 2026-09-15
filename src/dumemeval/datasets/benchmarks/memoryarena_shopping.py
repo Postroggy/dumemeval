@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from ...models import EvalTask, SessionSpec
 from ..benchmark import BenchmarkAdapter, BenchmarkData, register_benchmark
 from ._common import query_text
+from ._memoryarena import take, validate_ids, validate_rounds
 
 
 class ShoppingSample(BaseModel):
@@ -33,7 +34,11 @@ class MemoryArenaShoppingData(BenchmarkData):
 
     @classmethod
     def from_raw(cls, raw: Any) -> MemoryArenaShoppingData:
-        return cls(samples=[ShoppingSample.model_validate(item) for item in raw])
+        samples = [ShoppingSample.model_validate(item) for item in raw]
+        validate_ids([sample.id for sample in samples])
+        for sample in samples:
+            validate_rounds(sample.questions, sample.answers)
+        return cls(samples=samples)
 
 
 @register_benchmark
@@ -55,10 +60,10 @@ class MemoryArenaShoppingAdapter(BenchmarkAdapter):
         if not isinstance(data, MemoryArenaShoppingData):
             raise TypeError(f"Expected MemoryArenaShoppingData, got {type(data)}")
         tasks: list[EvalTask] = []
-        samples = data.samples[:subset] if subset else data.samples
+        samples = take(data.samples, subset)
         for item in samples:
-            questions = item.questions[:max_questions] if max_questions else item.questions
-            answers = item.answers[:max_questions] if max_questions else item.answers
+            questions = take(item.questions, max_questions)
+            answers = take(item.answers, max_questions)
             if not questions:
                 continue
             sessions = [
@@ -76,6 +81,8 @@ class MemoryArenaShoppingAdapter(BenchmarkAdapter):
                     description=f"MemoryArena bundled_shopping {item.category or item.id}",
                     sessions=sessions,
                     data={
+                        "sample_id": item.id,
+                        "source_round_count": len(item.questions),
                         "questions": [query_text(q) for q in questions],
                         "answers": answers,
                         "category": item.category,

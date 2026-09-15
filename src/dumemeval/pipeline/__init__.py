@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -16,9 +17,11 @@ from typing import Any
 
 from ..adapters.base import BaseMemoryAdapter
 from ..artifacts.provenance import derive_run_id
+from ..artifacts.redaction import Redactor
 from ..artifacts.report import ReportGenerator
 from ..core.config import ExperimentConfig
 from ..evaluation import CalculatorBenchmarkScorer, Verifier
+from ..evaluation.scorer import BenchmarkScorer
 from ..models import (
     BenchmarkResult,
     EvalTask,
@@ -33,6 +36,7 @@ from ..models import (
 )
 from .metrics_run import pool_benchmark, run_metrics
 from .run_index import write_run_index
+from .scoring import CheckpointedScorer, scoring_context
 from .summary import write_summary
 
 RuleJudge = Callable[[str, str, str], bool]
@@ -73,11 +77,24 @@ def finalize_run(
     if mock:
         judge_cfg["type"] = "rule"
 
+    checkpoint_context = (
+        scoring_context(judge_cfg, cfg.task.data.model_dump() if cfg.task.data else {}, Path(output_dir))
+        if not mock
+        else {}
+    )
+    redactor = Redactor(
+        {
+            **os.environ,
+            **cfg.execution.environment.env,
+            "JUDGE_API_KEY": os.environ.get(cfg.judging.api_key_env, ""),
+        }
+    )
+
     for task, result in zip(tasks, results, strict=True):
         ground_truth = parse_ground_truth(task.memory_ground_truth)
 
         bench_name = _benchmark_name(task)
-        scorer = (
+        scorer: BenchmarkScorer | None = (
             CalculatorBenchmarkScorer(
                 bench_name,
                 judge=rule_judge if mock else None,
@@ -87,6 +104,8 @@ def finalize_run(
             if bench_name
             else None
         )
+        if scorer is not None and not mock:
+            scorer = CheckpointedScorer(scorer, Path(output_dir) / "scoring", checkpoint_context, redactor)
         from ..evaluation import Evaluator
         from ..metrics import EfficiencyCalculator, QualityCalculator, TraceCalculator, UtilityCalculator
 
@@ -127,6 +146,7 @@ def finalize_run(
                     )
                 ),
                 benchmark_f1=bench_main,
+                execution_status=result.status,
             )
         )
 

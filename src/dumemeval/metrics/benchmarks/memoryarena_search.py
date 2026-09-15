@@ -4,7 +4,8 @@
 - env/env_systems/web_search_env/search_agent/prompts.py ``GRADER_TEMPLATE``
   （模板在 ``verifier/prompts.py`` SEARCH_GRADER_JUDGE_PROMPT，输出字段解析在
   ``verifier/parsers.py`` parse_judge_response——见 verifier 判分体系）
-- run_search.py：accuracy = 判定为 correct 的比例；无 judgement 计为不正确（计入分母）
+- run_search.py：每个 query ID 的最终综合问题判为 correct 的比例。
+- browsecomp_plus_env.py::run_full：前置子问题构建 memory，仅 run_final_query 判分。
 
 本任务的 answers 是检索答案文本，不是 ASIN，也不是 travel daily_plans。
 不把 shopping/travel 指标套过来。recall 依赖 qrel/doc id，本地 jsonl 无该字段则不报 recall。
@@ -19,12 +20,20 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from ..core.base import MetricBundle, MetricCalculator, MetricInput, MetricKind, round_items
+from ...models import BenchmarkResult
+from ..core.base import (
+    MetricBundle,
+    MetricCalculator,
+    MetricInput,
+    MetricKind,
+    outcome_for_round,
+    round_items,
+)
 from .locomo import JudgeFn
 
 
 class MemoryArenaSearchCalculator(MetricCalculator):
-    """progressive_search：官方 accuracy（unevaluated 计错）。"""
+    """progressive_search：最终综合问题的官方 accuracy。"""
 
     name: ClassVar[str] = "memoryarena_search"
     kind: ClassVar[MetricKind] = "benchmark"
@@ -36,32 +45,56 @@ class MemoryArenaSearchCalculator(MetricCalculator):
         self._llm_config = llm_config
 
     def calculate(self, inp: MetricInput) -> MetricBundle:
-        flags: list[float] = []
-        confidences: list[float] = []
-        details: list[dict[str, Any]] = []
-        n = 0
-        for idx, _question, query, gold, pred in round_items(inp):
-            n += 1
-            gold_text = gold if isinstance(gold, str) else str(gold)
-            parsed = self._judge_one(pred, gold_text, query)
-            correct = bool(parsed.get("correct"))
-            flags.append(1.0 if correct else 0.0)
-            if parsed.get("confidence") is not None:
-                confidences.append(float(parsed["confidence"]))
-            details.append(
-                {
-                    "round_idx": idx,
-                    "query": query,
-                    "correct": correct,
-                    "parse_error": parsed.get("parse_error", False),
-                    "confidence": parsed.get("confidence"),
-                }
-            )
+        rounds = list(round_items(inp))
+        source_count = int(inp.task.data.get("source_round_count", len(rounds)))
+        detail: dict[str, Any] = {
+            "sample_id": inp.task.data.get("sample_id"),
+            "round_idx": source_count - 1,
+            "source_round_count": source_count,
+            "score_status": "not_measured",
+            "official_score": None,
+        }
+        bundle = MetricBundle(name=self.name, kind=self.kind, details=[detail])
+        detail = bundle.details[0]
+        if not rounds or len(rounds) != source_count:
+            detail["reason"] = "Original final combined query is absent (empty or truncated task)."
+            return bundle
+        idx, _question, query, gold, pred = rounds[-1]
+        outcome = outcome_for_round(inp, idx)
+        managed = inp.task.task_environment.get("type") == "memoryarena"
+        if outcome is None or not outcome.success or (managed and outcome.environment is None):
+            detail["reason"] = "Final query execution or required environment evidence is missing or failed."
+            return bundle
+        parsed = self._judge_one(pred, gold if isinstance(gold, str) else str(gold), query)
+        if parsed.get("score_status") == "not_measured":
+            detail.update(parsed)
+            return bundle
+        correct = bool(parsed.get("correct"))
+        detail.update(
+            query=query,
+            correct=correct,
+            parse_error=parsed.get("parse_error", False),
+            confidence=parsed.get("confidence"),
+            score_status="measured",
+            official_score=float(correct),
+            judge_observation=parsed.get("raw"),
+        )
+        bundle.values["accuracy"] = float(correct)
+        if parsed.get("confidence") is not None:
+            bundle.values["confidence"] = float(parsed["confidence"])
+        return bundle
 
-        values: dict[str, float] = {"accuracy": sum(flags) / n if n else 0.0}
+    def aggregate(self, results: list[BenchmarkResult]) -> BenchmarkResult:
+        """Each complete query ID has equal weight, regardless of context length."""
+        pooled = BenchmarkResult(benchmark=self.name, details=[d for r in results for d in r.details])
+        if not results or any("accuracy" not in result.values for result in results):
+            return pooled
+        pooled.primary_metric = "accuracy"
+        pooled.values["accuracy"] = sum(r.values["accuracy"] for r in results) / len(results)
+        confidences = [r.values["confidence"] for r in results if "confidence" in r.values]
         if confidences:
-            values["confidence"] = sum(confidences) / len(confidences)
-        return MetricBundle(name=self.name, kind=self.kind, values=values, details=details)
+            pooled.values["confidence"] = sum(confidences) / len(confidences)
+        return pooled
 
     def _judge_one(self, pred: str, gold: str, question: str) -> dict[str, Any]:
         if self._judge is not None:
@@ -74,9 +107,12 @@ class MemoryArenaSearchCalculator(MetricCalculator):
             from ...verifier import make_llm_judge
 
             self._llm = make_llm_judge("search_grader", self._llm_config)
-        verdict = self._llm.verify(pred, gold, question=question)
-        return {
-            "correct": verdict.is_pass,
-            "parse_error": False,
-            "confidence": 100.0 if verdict.is_pass else 0.0,
-        }
+        try:
+            verdict = self._llm.verify(pred, gold, question=question)
+        except Exception as exc:
+            return {"score_status": "not_measured", "judge_error": f"{type(exc).__name__}: {exc}"}
+        if verdict.label == "SKIPPED":
+            return {"score_status": "not_measured", "judge_error": verdict.reason, "raw": verdict.raw}
+        from ...verifier.parsers import parse_judge_response
+
+        return {**parse_judge_response(verdict.raw), "raw": verdict.raw}

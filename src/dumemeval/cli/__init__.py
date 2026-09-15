@@ -64,6 +64,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     prepare_parser = sub.add_parser("prepare", help="一键下载官方评测数据到本地缓存并切 smoke 子集")
     prepare_parser.add_argument(
+        "--environment-config", help="校验场景源码、依赖与资源，并写 preparation.json"
+    )
+    prepare_parser.add_argument(
+        "--clone-reference", action="store_true", help="缺少场景源码时克隆到配置中的路径"
+    )
+    prepare_parser.add_argument(
         "--dataset",
         choices=("all", *prepare_cli_names()),
         default="all",

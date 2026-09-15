@@ -4,7 +4,7 @@
 - Responses API 优先，退 chat completions（仅对"API 不支持"类错误回退）
 - base_url 自动补 /v1（网关兼容）
 - reasoning_content fallback（DeepSeek 推理模型）
-- num_runs 多数票 / 瞬时错误重试 / skip_failed / save_model_input
+- num_runs 多数票 / 明确限流拒绝重试 / skip_failed / save_model_input
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ class LLMJudgeVerifier(BaseVerifier):
     config:
         prompt / model / provider / api_key_env / base_url / temperature / max_tokens
         num_runs: 重复次数（多数票 + 分数均值，默认 1）
-        max_retries: 瞬时错误最多尝试次数（含首次，默认 3）
+        max_retries: 明确 429 拒绝最多尝试次数（含首次，默认 3）；送达不确定时不重试
         skip_failed: 失败记 SKIPPED 而非抛出
         save_model_input: 把 user prompt 写入 Verdict.model_input
     """

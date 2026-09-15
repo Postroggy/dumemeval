@@ -10,12 +10,14 @@ Source: https://github.com/ZexueHe/MemoryArena · Paper: https://arxiv.org/abs/2
 
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
 from ...models import EvalTask, MemoryFact, SessionSpec
 from ..benchmark import BenchmarkAdapter, BenchmarkData, register_benchmark
+from ._memoryarena import take, validate_ids, validate_rounds
 
 JudgementMode = Literal["hint", "answer", "none"]
 
@@ -47,22 +49,25 @@ class MemoryArenaTravelData(BenchmarkData):
         samples: list[TravelSample] = []
         for item in raw:
             questions = item.get("questions", [])
+            validate_rounds(questions, item.get("answers", []))
             parsed_qs = [
                 TravelQuestion(
-                    round_idx=i,
-                    name=q.get("name", "") if isinstance(q, dict) else "",
+                    round_idx=q.get("round_idx", i + 1) if isinstance(q, dict) else i + 1,
+                    name=q.get("name", "Person") if isinstance(q, dict) else _person_name(q),
                     query=q if isinstance(q, str) else q.get("query", ""),
                 )
                 for i, q in enumerate(questions)
             ]
+            validate_ids([q.round_idx for q in parsed_qs])
             samples.append(
                 TravelSample(
                     id=item.get("id", 0),
                     base_person=item.get("base_person") or {},
                     questions=parsed_qs,
-                    answers=item.get("answers", []),
+                    answers=_align_answers(parsed_qs, item.get("answers", [])),
                 )
             )
+        validate_ids([sample.id for sample in samples])
         return cls(samples=samples)
 
 
@@ -93,11 +98,11 @@ class MemoryArenaTravelAdapter(BenchmarkAdapter):
             self.judgement_mode = judgement_mode
 
         tasks: list[EvalTask] = []
-        samples = data.samples[:subset] if subset else data.samples
-        for idx, item in enumerate(samples):
+        samples = take(data.samples, subset)
+        for item in samples:
             base_person = item.base_person
-            questions = item.questions[:max_questions] if max_questions else item.questions
-            answers = item.answers[:max_questions] if max_questions else item.answers
+            questions = take(item.questions, max_questions)
+            answers = take(item.answers, max_questions)
             if not questions:
                 continue
 
@@ -105,6 +110,7 @@ class MemoryArenaTravelAdapter(BenchmarkAdapter):
 
             if base_person:
                 base_text = f"旅行者：{base_person.get('name', '')}\n需求：{base_person.get('query', '')}"
+                base_text += f"\n基础行程：\n{_json_dumps(base_person.get('daily_plans', []))}"
                 sessions.append(
                     SessionSpec(
                         id=1,
@@ -119,7 +125,8 @@ class MemoryArenaTravelAdapter(BenchmarkAdapter):
                         id=len(sessions) + 1,
                         instruction=(
                             f"这是第 {round_idx + 1} 个规划回合。请根据你记住的旅行者偏好"
-                            f"（包括之前的回合信息）完成这个规划请求：\n\n{q.query}"
+                            f"（包括之前的回合信息）完成这个规划请求：\n\n{q.query}\n\n"
+                            f"输出格式：=== {q.name}'s Plan ===，随后逐日列出 Day N: 和行程槽位。"
                         ),
                         memory_inject=True,
                         query=q.query,
@@ -134,12 +141,14 @@ class MemoryArenaTravelAdapter(BenchmarkAdapter):
                     facts.append(MemoryFact(fact=line, category="persona"))
 
             task = EvalTask(
-                name=f"memoryarena_travel_{idx}",
-                description=f"MemoryArena travel group {idx}",
+                name=f"memoryarena_travel_{item.id}",
+                description=f"MemoryArena travel group {item.id}",
                 sessions=sessions,
                 memory_ground_truth="\n".join(f.fact for f in facts),
                 task_ground_truth=_json_dumps(answers),
                 data={
+                    "sample_id": item.id,
+                    "source_round_count": len(item.questions),
                     "questions": [q.model_dump() for q in questions],
                     "answers": answers,
                     "base_person": base_person,
@@ -149,6 +158,23 @@ class MemoryArenaTravelAdapter(BenchmarkAdapter):
             )
             tasks.append(task)
         return tasks
+
+
+def _person_name(query: str) -> str:
+    match = re.match(r"I am (\w+)\.", query)
+    return match.group(1) if match else "Person"
+
+
+def _align_answers(questions: list[TravelQuestion], answers: list[Any]) -> list[Any]:
+    indexed = [answer for answer in answers if isinstance(answer, dict) and "round_idx" in answer]
+    if not indexed:
+        return answers
+    if len(indexed) != len(answers):
+        raise ValueError("Travel answers cannot mix indexed and unindexed rounds")
+    by_round = {answer["round_idx"]: answer for answer in indexed}
+    if len(by_round) != len(answers) or set(by_round) != {q.round_idx for q in questions}:
+        raise ValueError("Travel answer round_idx values must match question round_idx values")
+    return [by_round[q.round_idx] for q in questions]
 
 
 def _json_dumps(obj: Any) -> str:

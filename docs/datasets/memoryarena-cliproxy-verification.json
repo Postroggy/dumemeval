@@ -1,0 +1,203 @@
+{
+  "date": "2026-09-15",
+  "proxy": {
+    "version": "7.3.2",
+    "commit": "7fa443dc8bf8ca2f1ffd81c2472deb31b097b697",
+    "archive_sha256": "a07ada91dcd83f24e491c78ad543a9d08d36d2472408194b21cf9d0a46eb4be1",
+    "license": "MIT",
+    "listen": "127.0.0.1:8317",
+    "model": "gpt-5.5",
+    "reasoning_effort": "medium",
+    "refresh_token_shared": false
+  },
+  "text_probe": {
+    "success": true,
+    "model": "gpt-5.5",
+    "response": "PROXY_OK",
+    "stop_reason": "end_turn",
+    "usage": {
+      "cache_creation": null,
+      "cache_creation_input_tokens": null,
+      "cache_read_input_tokens": null,
+      "inference_geo": null,
+      "input_tokens": 308,
+      "output_tokens": 18,
+      "output_tokens_details": {
+        "thinking_tokens": 9
+      },
+      "server_tool_use": null,
+      "service_tier": null
+    }
+  },
+  "tool_round_trip": {
+    "success": true,
+    "model": "gpt-5.5",
+    "tool_name": "echo",
+    "tool_input": {
+      "value": "PROXY_TOOL_OK"
+    },
+    "answer": "PROXY_TOOL_OK",
+    "usage": [
+      {
+        "cache_creation": null,
+        "cache_creation_input_tokens": null,
+        "cache_read_input_tokens": null,
+        "inference_geo": null,
+        "input_tokens": 357,
+        "output_tokens": 20,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "server_tool_use": null,
+        "service_tier": null
+      },
+      {
+        "cache_creation": null,
+        "cache_creation_input_tokens": null,
+        "cache_read_input_tokens": null,
+        "inference_geo": null,
+        "input_tokens": 391,
+        "output_tokens": 8,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "server_tool_use": null,
+        "service_tier": null
+      }
+    ]
+  },
+  "framework_judge_probe": {
+    "framework_judge_result": "PROXY_JUDGE_OK",
+    "expected": "PROXY_JUDGE_OK",
+    "passed": true
+  },
+  "docker": {
+    "engine": "28.3.2",
+    "linux_container": "passed",
+    "project_bind_mount": "passed",
+    "proxy_reachable_from_container": true,
+    "unauthenticated_proxy_status": 401
+  },
+  "checks": {
+    "verifier_tests_passed": 26,
+    "new_regression_tests_passed": 2,
+    "full_tests": {
+      "passed": 500,
+      "failed": 108,
+      "skipped": 13,
+      "new_failures": [],
+      "timing": "Historical run before the latest minimal-verification instruction."
+    },
+    "mypy_errors": 172,
+    "ruff": "passed",
+    "format": "passed",
+    "diff_check": "passed",
+    "portable_smoke_configs": "Both loaded and validated without model calls."
+  },
+  "harbor": {
+    "status": "minimal_end_to_end_passed",
+    "exit_code": 0,
+    "scene": "math",
+    "source_rows": 1,
+    "max_questions": 2,
+    "sessions_completed": 2,
+    "session_execution_errors": 0,
+    "official_tool_events_completed": 4,
+    "official_submit_count": 2,
+    "judge_observations": [
+      "no",
+      "yes"
+    ],
+    "measured_question_correctness": [
+      false,
+      true
+    ],
+    "complete_paper": false,
+    "controlled_comparison_completed": false,
+    "summary_warnings": [
+      "Official aggregate is unmeasured: incomplete evidence or truncated tasks"
+    ],
+    "native_auto_memory_disable_flag_observed": true,
+    "native_process_settings": {
+      "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+      "CLAUDE_CONFIG_DIR": "/logs/agent/sessions",
+      "ANTHROPIC_MODEL": "gpt-5.5(medium)",
+      "ANTHROPIC_BASE_URL": "http://host.docker.internal:8317",
+      "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+    },
+    "same_memory_mount_across_sessions": true,
+    "agent_saved_memory_file": false,
+    "cleanup_status": "completed",
+    "environment_closed": true,
+    "worker_exit_code": 1,
+    "worker_exit_note": "Windows subprocess.terminate records exit code 1; owned worker reaped and cleanup completed.",
+    "owned_trial_containers_remaining": 0,
+    "result_dir": "results/memoryarena/cliproxy-minimal-openai-20260915"
+  },
+  "verification_scope": "User-requested minimal execution checks only; no full dataset or repeated full test suite.",
+  "official_backend_probe": {
+    "backend": "official.OpenAIBackend",
+    "model": "gpt-5.5(medium)",
+    "success": true,
+    "answer": "Solve:\n\n\\[\nx^2 - 7x + 12 = 0\n\\]\n\nFactor:\n\n\\[\nx^2 - 7x + 12 = (x-3)(x-4)\n\\]\n\nSet each factor equal to zero:\n\n\\[\nx-3=0 \\Rightarrow x=3\n\\]\n\n\\[\nx-4=0 \\Rightarrow x=4\n\\]\n\nSo the integer roots are:\n\n\\[\n\\boxed{3 \\text{ and } 4}\n\\]"
+  },
+  "agent_image": {
+    "tag": "dumemeval-claude:2.1.89-smoke-20260915",
+    "base_digest": "sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285",
+    "native_claude_version": "2.1.89",
+    "native_binary_sha256": "903cb3c96b314d86856632c8702f5cdf971b804d0b19ef87446573bcd1d7df1c",
+    "native_binary_size": 228473472,
+    "checksum_verified_against_official_manifest": true
+  },
+  "memory_canary": {
+    "status": "passed",
+    "exit_code": 0,
+    "synthetic_not_benchmark": true,
+    "sessions_completed": 2,
+    "fresh_agent_session_ids": [
+      "d35e99c9-1d58-4c67-a1c5-dd6856c459f0",
+      "e26f57f3-9464-400b-8cf3-fd42161d8b2b"
+    ],
+    "uuid_generated_by_agent_in_session_1": true,
+    "uuid_absent_from_session_2_prompt": true,
+    "session_2_file_read_observed": true,
+    "session_2_answer_matches_saved_uuid": true,
+    "persistent_file_and_both_snapshots_match": true,
+    "uuid_sha256": "e6f40e9d6265a66dbd1800a55c5009fd7690307ee4c75846a093a2759ee192d8",
+    "result_dir": "results/memoryarena/cliproxy-memory-canary-20260915"
+  },
+  "diagnostic_attempts": [
+    {
+      "result_dir": "results/memoryarena/cliproxy-smoke-20260915",
+      "status": "cancelled_during_cold_agent_install",
+      "comparison_eligible": false
+    },
+    {
+      "result_dir": "results/memoryarena/cliproxy-minimal-20260915",
+      "status": "official_anthropic_backend_thinking_block_error",
+      "cleanup_completed": true,
+      "comparison_eligible": false
+    }
+  ],
+  "credential_scan": {
+    "secret_matches_after_redaction": 0
+  },
+  "artifacts_sha256": {
+    "results/memoryarena/cliproxy-minimal-openai-20260915/memoryarena_math_0__memoryarena-on/result.json": "b8f8c6b618342223095fb65f45fa7fdc7d52b953a6e5171ef2516beedf1e2427",
+    "results/memoryarena/cliproxy-minimal-openai-20260915/environments/memoryarena_math_0-feb6cbd2/trace.json": "2f9e7181e6a45f9ae9074f1ef317803b9e6ba4b15cc52baabbe85a3ef6aee978",
+    "results/memoryarena/cliproxy-minimal-openai-20260915/environments/memoryarena_math_0-feb6cbd2/runtime.json": "e2f5c16daf03fa746cfae93df458d6def3ac3c59b3ad5694c18cebf1ee7d57aa",
+    "results/memoryarena/cliproxy-minimal-openai-20260915/summary.json": "e29d636ff761e3c13cc3b1dc2fc01ad3f57d328dc64540149840f13513c8f8d7",
+    "results/memoryarena/cliproxy-minimal-openai-20260915/native-environment.json": "00d9fa91ae4ad999c9d77aca4836ffb74e286ad9b5e63941cd534845ac005cc6",
+    "results/memoryarena/cliproxy-memory-canary-20260915/memoryarena-memory-canary__memory-canary/result.json": "1cf7146b16f0aba2fd2dc06a85a082363aa6abfabc6eb38fd30a43fa9a893771",
+    "results/memoryarena/cliproxy-memory-canary-20260915/summary.json": "0b091ec2a8a6a4e026a6314879a15a7c29b9f2693475a92f7e46a438574e9afe",
+    "results/memoryarena/cliproxy-memory-canary-20260915/trials/dumemeval_memoryarena-memory-canary__session_1/agent/trajectory.json": "2d774f931dd823a093d402bf3b29ed7a3fddbc8faa745b13b53ce1dad4964bd2",
+    "results/memoryarena/cliproxy-memory-canary-20260915/trials/dumemeval_memoryarena-memory-canary__session_2/agent/trajectory.json": "9c4b58066e2fde8a89f8edd29f445a1710a567b2e8fea6db8dfe86055b354912",
+    "results/memoryarena/cliproxy-memory-canary-20260915/persistent/transfer-canary.txt": "e6f40e9d6265a66dbd1800a55c5009fd7690307ee4c75846a093a2759ee192d8",
+    "results/memoryarena/cliproxy-memory-canary-20260915/snapshots/memory-canary/memoryarena-memory-canary/session_1/transfer-canary.txt": "e6f40e9d6265a66dbd1800a55c5009fd7690307ee4c75846a093a2759ee192d8",
+    "results/memoryarena/cliproxy-memory-canary-20260915/snapshots/memory-canary/memoryarena-memory-canary/session_2/transfer-canary.txt": "e6f40e9d6265a66dbd1800a55c5009fd7690307ee4c75846a093a2759ee192d8",
+    "results/memoryarena/cliproxy-minimal-openai-20260915/trials/dumemeval_memoryarena_math_0__session_1/agent/trajectory.json": "26a90a29c1fe6d512d85a85e8984025531f7d0e5c830d5711b626b46366d06c0",
+    "results/memoryarena/cliproxy-minimal-openai-20260915/trials/dumemeval_memoryarena_math_0__session_2/agent/trajectory.json": "16fb5f10753b276f80bb95fcc21e79f1a9cb00c1c8285b71805390247ddc2174"
+  },
+  "superseded_by": "memoryarena-acceptance-verification.json",
+  "record_scope": "Historical proxy and diagnostic runs; complete controlled acceptance is recorded separately"
+}
