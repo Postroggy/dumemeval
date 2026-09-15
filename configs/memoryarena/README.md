@@ -8,6 +8,10 @@ GPT-5.5 medium 的真实两问题 Math 诊断，设置和证据见
 完整两轮 `controlled-math.yaml` 对照实验及依赖外部资源的官方工具通信检查也已通过，
 见 [本地验收记录](../../docs/datasets/memoryarena-acceptance.md)。
 
+Hermes 0.21.3 的同样本真实 on/off 复跑和随机标记记忆诊断也已通过。
+配置、兼容入口、固定镜像构建和脱敏证据见
+[Hermes 验收与复现](../../docs/datasets/memoryarena-hermes.md)。
+
 ## 安装与准备
 
 新环境先阅读 [从零安装指南](../../docs/datasets/memoryarena-clean-setup.md)，
@@ -39,7 +43,7 @@ DuMemEval 保持 Python 3.12，独立启动脚本允许使用与上游兼容的�
 
 | 场景 | 额外准备 |
 | --- | --- |
-| Math / Phys | 无需语料或商品资源，安装兼容的 memoryarena 可选依赖组即可。 |
+| Math / Phys | 无需语料或商品资源。除 memoryarena 依赖组外，安装所选 backend 的 SDK：OpenAI/OpenRouter 用 openai（包含于 judge 依赖组），Anthropic 用 anthropic，Gemini/Google 用 google-genai。prepare 会检查实际 worker 中的依赖。 |
 | Travel | 准备官方 travel_planner_env/database CSV，其中 flights/clean_Flights_2022.csv 按固定版本的 [数据库 README](https://github.com/ZexueHe/MemoryArena/blob/6cd9de14b71915e39ac742a20dc33785e14b6aab/env/env_systems/travel_planner_env/database/README.md) 单独下载。MEMORYARENA_TRAVEL_DATABASE 可覆盖数据库目录。 |
 | Shopping | 使用已验证的 worker-requirements.txt、Python 3.10.21 和 Java 17，并设置 MEMORYARENA_JAVA_HOME。官方依赖锁定存在冲突，兼容 worker 清单是已记录的差异。将 [商品数据库](https://huggingface.co/datasets/ai-hyz/MemoryArena-product-db) 下载到 MEMORYARENA_PRODUCT_DATA（默认 .cache/memoryarena-products）。必需文件：items_shuffle.json、items_ins_v2.json、domain_data.json、product_catalog/*.json 和 search_engine/indexes-full/*。 |
 | Search | 按固定版本的 [索引准备指南](https://github.com/ZexueHe/MemoryArena/blob/6cd9de14b71915e39ac742a20dc33785e14b6aab/setup_web_search_env.md) 操作。提供匹配的 MEMORYARENA_SEARCH_INDEX、MEMORYARENA_SEARCH_IDS 和 MEMORYARENA_SEARCH_CORPUS 文件。OpenAI searcher 还需要与索引匹配的 OPENAI_API_KEY、OPENAI_BASE_URL 和 MEMORYARENA_EMBEDDING_MODEL。上游导入依赖 FAISS、FastMCP、transformers、Torch 和 Tevatron。 |

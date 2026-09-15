@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -12,7 +13,7 @@ from dumemeval.metrics import MetricInput, MetricsAggregator, TraceCalculator
 from dumemeval.models import EvalTask, MemorySpec, SessionOutcome, SessionSpec, TaskExecution
 
 
-def _read_step(path: str, *, failed: bool = False, call_id: str = "read1") -> dict:
+def _read_step(path: str, *, failed: bool = False, call_id: str = "read1") -> dict[str, Any]:
     return {
         "source": "agent",
         "tool_calls": [{"tool_call_id": call_id, "function_name": "Read", "arguments": {"file_path": path}}],
@@ -68,6 +69,7 @@ def test_file_change_then_correlated_read_across_sessions(tmp_path: Path) -> Non
         task_id="task", task_name="task", memory_backend="directory", memory_ops=adapter.all_ops()
     )
     report = MetricsAggregator([TraceCalculator()]).run(MetricInput(task=task, execution=execution))
+    assert report.trace is not None
     assert report.trace.memory_tool_used is True
     assert report.trace.memory_write_ops == report.trace.memory_read_ops == 1
     events = [op for op in adapter.all_ops() if op.source != "adapter"]
@@ -86,7 +88,7 @@ def test_file_change_then_correlated_read_across_sessions(tmp_path: Path) -> Non
         [{"source": "user", "message": "I read /app/memory/notes.txt"}],
     ],
 )
-def test_missing_or_invalid_read_is_unmeasured(tmp_path: Path, steps: list[dict]) -> None:
+def test_missing_or_invalid_read_is_unmeasured(tmp_path: Path, steps: list[dict[str, Any]]) -> None:
     adapter, task = _adapter(tmp_path)
     session = task.sessions[0]
     adapter.inject(session, {})
@@ -98,6 +100,7 @@ def test_missing_or_invalid_read_is_unmeasured(tmp_path: Path, steps: list[dict]
         task_id="task", task_name="task", memory_backend="directory", memory_ops=adapter.all_ops()
     )
     report = MetricsAggregator([TraceCalculator()]).run(MetricInput(task=task, execution=execution))
+    assert report.trace is not None
     assert report.trace.memory_tool_used is None
     assert report.trace.memory_write_ops is None
     assert report.trace.memory_read_ops is None

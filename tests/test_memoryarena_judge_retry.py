@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 import os
 import threading
+from collections.abc import Iterator
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any, Literal
 
 import pytest
 
@@ -23,15 +25,15 @@ from tests.test_memoryarena_search_scoring import search_task
 
 
 @contextmanager
-def lost_response_endpoint():
-    deliveries = []
+def lost_response_endpoint() -> Iterator[tuple[str, list[dict[str, Any]]]]:
+    deliveries: list[dict[str, Any]] = []
 
     class Endpoint(BaseHTTPRequestHandler):
-        def do_POST(self):
+        def do_POST(self) -> None:
             deliveries.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
             self.close_connection = True
 
-        def log_message(self, *args):
+        def log_message(self, format: str, *args: object) -> None:
             pass
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Endpoint)
@@ -77,6 +79,7 @@ def test_framework_judge_lost_response_is_unmeasured_without_sdk_or_resume_repla
                 Redactor({}),
             )
             result = Evaluator(None, scorer).evaluate(task, execution)
+            assert result.benchmark is not None
             assert result.benchmark.values == {}
             assert result.benchmark.details[0]["score_status"] == "not_measured"
             assert len(deliveries) == 1
@@ -84,7 +87,7 @@ def test_framework_judge_lost_response_is_unmeasured_without_sdk_or_resume_repla
 
 @pytest.mark.parametrize("scene,provider", [("math", "openai"), ("phys", "anthropic")])
 def test_official_worker_lost_judge_response_is_not_replayed(
-    tmp_path: Path, scene: str, provider: str
+    tmp_path: Path, scene: Literal["math", "phys"], provider: str
 ) -> None:
     reference = os.environ.get("MEMORYARENA_REFERENCE")
     if not reference:
@@ -109,11 +112,14 @@ def test_official_worker_lost_judge_response_is_not_replayed(
         runtime = MemoryArenaRuntime(task, config, tmp_path)
         try:
             runtime.open()
-            assert "max_retries=0" in runtime.service.fingerprint["sdk_retry_policy"]
+            retry_policy = runtime.service.fingerprint["sdk_retry_policy"]
+            assert isinstance(retry_policy, str) and "max_retries=0" in retry_policy
             # Reset retains the configured client in the pinned Math/Phys implementation.
+            assert runtime.client is not None
             runtime.client.reset(seed=37)
             session = task.sessions[0]
             binding = runtime.begin_session(session)
+            assert runtime.gateway is not None
             payload = (
                 ToolCall(request_id="one-submission", tool="submit", arguments={"answer": "2"})
                 .model_dump_json()
@@ -135,7 +141,7 @@ def test_explicit_rate_limit_can_retry_without_repeating_accepted_inference() ->
     class Rejected(Exception):
         status_code = 429
 
-    def request():
+    def request() -> str:
         requests.append("request")
         if len(requests) == 1:
             raise Rejected("rate limit")
@@ -152,7 +158,7 @@ def test_server_error_cannot_be_replayed(status: int) -> None:
     class Uncertain(Exception):
         status_code = status
 
-    def request():
+    def request() -> None:
         requests.append("request")
         raise Uncertain("unsupported endpoint after unknown upstream outcome")
 

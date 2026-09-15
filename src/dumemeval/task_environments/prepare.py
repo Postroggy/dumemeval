@@ -100,6 +100,14 @@ def required_assets(config: ArenaRuntimeConfig) -> list[str]:
     return []
 
 
+def _module_available(module: str) -> bool:
+    try:
+        return importlib.util.find_spec(module) is not None
+    except (ImportError, ValueError):
+        # A dotted module such as google.genai may have no installed parent.
+        return False
+
+
 def inspect_environment(config: ArenaRuntimeConfig, *, clone: bool = False) -> PreparationReport:
     reference = config.reference.resolve()
     report = PreparationReport(reference=str(reference), revision=config.revision, scene=config.env_name)
@@ -127,6 +135,19 @@ def inspect_environment(config: ArenaRuntimeConfig, *, clone: bool = False) -> P
         for path in sorted(files):
             report.assets[str(path.resolve())] = checksum(path)
     modules = ["fastapi", "uvicorn", "anthropic", "datasets"]
+    if config.env_name in {"math", "phys"}:
+        backend = str(config.env_config.get("backend", "openai")).lower()
+        sdk = {
+            "openai": "openai",
+            "openrouter": "openai",
+            "anthropic": "anthropic",
+            "gemini": "google.genai",
+            "google": "google.genai",
+        }.get(backend)
+        if sdk is None:
+            report.missing.append(f"Unsupported Math/Phys backend: {backend}")
+        elif sdk not in modules:
+            modules.append(sdk)
     if config.env_name == "webshop":
         modules += ["gym", "spacy", "en_core_web_lg", "pyserini", "bs4"]
     if config.env_name == "browsecomp-plus":
@@ -143,9 +164,13 @@ def inspect_environment(config: ArenaRuntimeConfig, *, clone: bool = False) -> P
                 report.missing.append("Search snippets require HF_HUB_OFFLINE=1 and TRANSFORMERS_OFFLINE=1")
     if config.python:
         script = (
-            "import importlib.util,json; print(json.dumps([m for m in "
-            + repr(modules)
-            + " if importlib.util.find_spec(m) is None]))"
+            "import importlib.util, json\n"
+            "def available(module):\n"
+            "    try:\n"
+            "        return importlib.util.find_spec(module) is not None\n"
+            "    except (ImportError, ValueError):\n"
+            "        return False\n"
+            f"print(json.dumps([m for m in {modules!r} if not available(m)]))"
         )
         try:
             proc = subprocess.run(
@@ -155,7 +180,7 @@ def inspect_environment(config: ArenaRuntimeConfig, *, clone: bool = False) -> P
         except (OSError, ValueError, subprocess.SubprocessError):
             missing = ["configured worker Python is unavailable"]
     else:
-        missing = [module for module in modules if importlib.util.find_spec(module) is None]
+        missing = [module for module in modules if not _module_available(module)]
     report.missing.extend(f"Worker dependency: {module}" for module in missing)
     report.ready = not report.missing
     return report

@@ -62,3 +62,39 @@ pipeline 原有的 7 处类型错误位于 AST 与 HEAD 一致的函数中，无
 
 本文及安装说明改为中文后，当前证据包和校验清单同步更新文档哈希。
 原始审查报告、测试输出、真实实验轨迹及其历史证据包保持原样。
+
+## 提交前补充修复（2026-09-16）
+
+再次审查后补齐以下问题，并加入 [Hermes 的真实运行与记忆诊断材料](memoryarena-hermes.md)：
+
+- `memory_instruction` 现在参与实际任务指纹。只把 none 改为 location/proactive，
+  比较报告也会明确警告控制变量变化；提示词相同的 directory/none 对照不误报。
+- Math/Phys 准备阶段检查所选官方后端的 SDK，覆盖默认 OpenAI、OpenRouter、Anthropic、
+  Gemini/Google、缺失命名空间父包，以及显式 worker Python。未知后端在准备阶段失败。
+- 原流水线测试使用的手写记忆替身缺少新的 `observe_execution` 接口；改为继承正式适配器基类，
+  并断言两个会话的观测回调实际发生。相关回归测试也补齐严格类型与空值检查。
+
+本次验证没有再调用付费模型。新增的 45 项回归检查全部通过；
+Hermes Dockerfile 构建成功，新的复现入口通过断网容器中的版本/SDK/技能检查，
+实际官方 worker 的准备报告为 `ready=true`。文档中三个 PowerShell 代码块通过语法检查。
+160 份 Hermes 历史原记录的哈希全部吻合，证据包共 175 个成员，通过已知凭据扫描及 JSON/ZIP 校验。
+
+### 全仓检查与基线对照
+
+| 检查 | 当前分支 | 原仓库 `37a0e19` |
+| --- | --- | --- |
+| 完整非 e2e 测试 | 586 通过、108 失败、13 跳过 | 389 通过、109 失败、13 跳过 |
+| 完整 mypy | 152 条既有错误 | 173 条错误 |
+| 本次涉及的 12 个 Python 文件 mypy | 全部通过 | — |
+| 全仓 ruff / 格式 | 通过 | — |
+
+不是全仓全绿：当前失败测试全部能在原仓库基线复现，没有新增失败测试或新增类型错误类别。
+基线的 179 份源码、测试及配置文件已与固定提交的 Git archive 逐字节核验；
+对照按测试身份和类型诊断匹配，不只比较数量。13 项跳过来自其他数据集的外部资源检查。
+
+历史 Hermes 模型调用发生于 `909e185`。本次修复对应上述回归、构建与准备检查，
+没有改写历史分数、token/cost 或原生轨迹。
+
+- [本次检查清单与文件哈希](memoryarena-submission-verification.json)
+- [检查日志及基线对照证据](memoryarena-submission-checks.zip)
+- [Hermes 历史证据清单](memoryarena-hermes-verification.json)

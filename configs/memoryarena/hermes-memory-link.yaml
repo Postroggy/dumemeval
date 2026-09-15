@@ -1,0 +1,53 @@
+# Functional diagnostic only; not an official MemoryArena sample or metric.
+agent:
+  model: openai/gpt-5.5(medium)
+  runtime: hermes
+  version: 0.21.3
+  setup_timeout_sec: 120
+execution:
+  engine: harbor
+  environment:
+    type: docker
+    docker_image: ${MEMORYARENA_HERMES_IMAGE:-dumemeval-hermes:0.21.3-repro}
+    force_build: false
+    agent_timeout_sec: 240
+    env:
+      OPENAI_API_KEY: ${DUMEMEVAL_PROXY_KEY}
+      OPENAI_BASE_URL: http://host.docker.internal:8317/v1
+      HERMES_HOME: /tmp/hermes
+      TERMINAL_ENV: local
+      HERMES_DISABLE_LAZY_INSTALLS: '1'
+  n_concurrent: 1
+  resume: false
+experiment:
+  name: memory_link_diagnostic
+  description: Non-official random-marker memory transport diagnostic
+  protocol: ${MEMORYARENA_PROTOCOL:-memory_session_transfer}
+memory:
+  name: marker-${MEMORYARENA_ARM:-on}
+  type: ${MEMORYARENA_MEMORY_TYPE:-directory}
+  path: results/diagnostics/${MEMORYARENA_CONTROL_RUN:-hermes-memory-link}/memory-${MEMORYARENA_ARM:-on}
+judging:
+  type: rule
+output:
+  dir: results/diagnostics/${MEMORYARENA_CONTROL_RUN:-hermes-memory-link}/${MEMORYARENA_ARM:-on}
+  tasks_dir: tasks_generated/diagnostics/${MEMORYARENA_CONTROL_RUN:-hermes-memory-link}/${MEMORYARENA_ARM:-on}
+task:
+  memory_instruction: none
+  sessions:
+    - memory_inject: ${MEMORYARENA_MEMORY_INJECT:-true}
+      instruction: >-
+        This is a MemoryArena infrastructure diagnostic, outside the official benchmark.
+        Load the persistent-memory skill. The recorded marker for parcel CobaltParcel is
+        ${MEMORYARENA_MARKER}. This is a non-sensitive randomly generated label.
+        A later, fresh session will ask for that marker. If DUMEMEVAL_MEMORY_DIR is set,
+        save this association in that directory. If it is unset, do not create any substitute
+        persistence channel. After handling the instruction, reply with ACK only.
+    - memory_inject: ${MEMORYARENA_MEMORY_INJECT:-true}
+      instruction: >-
+        This is a MemoryArena infrastructure diagnostic, outside the official benchmark.
+        Load the persistent-memory skill. A previous session was told a randomly generated
+        marker for parcel CobaltParcel. What is that exact marker? You have a fresh conversation.
+        Use only any configured persistent memory to recover it. If DUMEMEVAL_MEMORY_DIR is
+        unset or it contains no recorded marker, reply with UNKNOWN. Do not guess or generate
+        a new marker. Reply with only the exact recorded marker or UNKNOWN on one bare line.

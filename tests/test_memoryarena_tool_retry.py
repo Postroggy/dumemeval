@@ -9,9 +9,12 @@ import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 
 import pytest
+from pydantic import JsonValue
 
+from dumemeval.models.environment import ToolCall
 from dumemeval.task_environments import agent_tool
 from dumemeval.task_environments.gateway import ToolGateway
 
@@ -26,10 +29,10 @@ def test_pending_identity_preserves_json_types(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("response_loss", ["disconnect", "invalid_json", "handler_error"])
 def test_process_retry_has_one_effect(tmp_path: Path, response_loss: str) -> None:
-    effects = []
-    deliveries = []
+    effects: list[ToolCall] = []
+    deliveries: list[dict[str, Any]] = []
 
-    def mutate(call):
+    def mutate(call: ToolCall) -> JsonValue:
         effects.append(call)
         if response_loss == "handler_error":
             raise OSError("mutation completed, artifact write failed")
@@ -39,7 +42,7 @@ def test_process_retry_has_one_effect(tmp_path: Path, response_loss: str) -> Non
     token = gateway.bind()
 
     class Proxy(BaseHTTPRequestHandler):
-        def do_POST(self):
+        def do_POST(self) -> None:
             payload = self.rfile.read(int(self.headers["Content-Length"]))
             deliveries.append(json.loads(payload))
             status, body = gateway.dispatch(self.headers.get("Authorization", ""), payload)
@@ -54,7 +57,7 @@ def test_process_retry_has_one_effect(tmp_path: Path, response_loss: str) -> Non
             self.end_headers()
             self.wfile.write(body)
 
-        def log_message(self, *args):
+        def log_message(self, format: str, *args: object) -> None:
             pass
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Proxy)
@@ -68,7 +71,7 @@ def test_process_retry_has_one_effect(tmp_path: Path, response_loss: str) -> Non
         "DUMEMEVAL_TOOL_STATE_DIR": str(tmp_path),
     }
 
-    def invoke(tool="buy", extra=()):
+    def invoke(tool: str = "buy", extra: tuple[str, ...] = ()) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [sys.executable, str(Path(agent_tool.__file__)), *extra, tool, '{"item":"A"}'],
             env=environment,

@@ -83,9 +83,12 @@ class TestVerifierFactory:
 class TestResponsesFallback:
     def test_unsupported_returns_true(self) -> None:
         """API 不支持类错误 → 可回退。"""
+
+        class UnsupportedEndpoint(RuntimeError):
+            response = SimpleNamespace(status_code=404)
+
         for text in ("404: endpoint not found", "Unknown endpoint: /v1/responses"):
-            error = RuntimeError(text)
-            error.response = SimpleNamespace(status_code=404)
+            error = UnsupportedEndpoint(text)
             assert LLMJudgeVerifier._is_responses_unsupported(error)
         assert not LLMJudgeVerifier._is_responses_unsupported(Exception("Unknown endpoint: /v1/responses"))
 

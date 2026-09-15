@@ -124,6 +124,9 @@ rg -n "^Source:|^Paper:" src/dumemeval/datasets/benchmarks/*.py
 | `evermembench_dynamic` | MC 规则判分 + OE LLM judge | 官方 `_parse_mc_answer` |
 | `perltqa` | EM + token F1 | ⚠️ 官方评测代码未发布，适配层自定义 |
 
+MemoryArena 另有 [Hermes 真实 on/off 与记忆通道验证](memoryarena-hermes.md)，
+含固定版本复现入口、原生轨迹与脱敏证据包。
+
 ## 未完成
 
 - 多数数据集只有 smoke 级验证，缺少与官方脚本逐样本对比的 parity 报告

@@ -1,8 +1,9 @@
 # MemoryArena 接入设计：Issue #4
 
-本地实现与验证记录，更新于 2026-09-15。
+本地实现与验证记录，更新于 2026-09-16。
 原 Issue 已通过最小规模的真实运行和官方固定样例验证，不声称完成了全量数据集评测。
 验收和复现入口见 [本地验收记录](memoryarena-acceptance.md)。
+新增运行时的真实验收与原始材料见 [Hermes 复跑](memoryarena-hermes.md)。
 本文及配套说明统一使用中文，以保持仓库文档风格一致；命令、API 标识和原始运行证据保留原文。
 
 ## 官方来源
@@ -92,10 +93,15 @@ Travel 上游加载器没有 revision 参数。因此 reset 校验会把所选 g
 证据区分官方环境响应、官方工具和 Agent 提交。执行错误和原始 judge 观测保持可见。
 缺失执行或评分时标为未测，不能记为 0 分。不完整或截断的 paper 不报告官方完整聚合分数。
 
-控制变量指纹覆盖任务内容/ID/指令、数据版本、Agent/模型/版本、judge 设置、
+控制变量指纹覆盖任务内容/ID/指令及 `memory_instruction` 后缀策略、数据版本、Agent/模型/版本、judge 设置、
 运行时设置、依赖、源码和外部资源哈希。实际观测到的 Harbor 模型/版本、官方 worker 版本
 与配置声明分开记录。比较报告会警告控制变量缺失或变化、执行不完整，以及 Shopping 上游随机性。
 两组配置均关闭 Claude 原生自动记忆；真实最小运行已检查 Claude 进程中的禁用标志。
+
+Math/Phys 的准备检查根据官方 `env_config.backend` 检查对应 SDK：默认 OpenAI，
+OpenRouter 也需要 `openai`，Anthropic 需要 `anthropic`，Gemini/Google 需要 `google.genai`。
+检查在实际 worker Python 中生效，缺少命名空间父包也应返回明确的缺依赖报告。
+未知后端必须在准备阶段失败；`ready` 不代表模型凭据、Docker 或 API 已通过真实调用。
 
 ## 验证结果与范围边界
 
@@ -120,4 +126,5 @@ Search tokenizer 和全部 100,195 篇索引文档均已锁定。
 详见 [验收记录](memoryarena-acceptance.md)、配套校验 JSON 和脱敏证据包。
 历史回归及评分一致性检查保留在 [本地验证清单](memoryarena-local-verification.json)；
 模型诊断接入过程见 [CLIProxyAPI 联调说明](memoryarena-cliproxyapi.md)。
-未运行完整数据集，也未重复运行完整测试套件。
+未运行完整数据集。2026-09-16 已执行完整非 e2e 测试套件并与原仓库基线对照，
+结果和既有失败见[提交前修复记录](memoryarena-acceptance-fixes.md#提交前补充修复2026-09-16)。

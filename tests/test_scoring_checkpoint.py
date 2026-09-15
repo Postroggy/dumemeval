@@ -15,7 +15,7 @@ from dumemeval.evaluation.scorer import BenchmarkScorer
 from dumemeval.execution.executor import SessionExecutor
 from dumemeval.lifecycle.parallel import ParallelTaskRunner
 from dumemeval.metrics.core.base import MetricInput
-from dumemeval.models import BenchmarkResult, MemorySpec, SessionOutcome, TaskExecution
+from dumemeval.models import BenchmarkResult, MemorySpec, SessionOutcome, SessionSpec, TaskExecution
 from dumemeval.pipeline import finalize_run
 from dumemeval.pipeline.scoring import CheckpointedScorer, ScoringCheckpointError, scoring_context
 from dumemeval.verifier.base import Verdict
@@ -110,12 +110,12 @@ async def test_real_pipeline_resume_reuses_agent_execution_and_final_judge(
     calls = {"agent": 0, "judge": 0}
 
     class FixedAgent(SessionExecutor):
-        async def run_session(self, session, session_ctx):
+        async def run_session(self, session: SessionSpec, session_ctx: dict[str, Any]) -> SessionOutcome:
             calls["agent"] += 1
             return SessionOutcome(session_id=session.id, success=True, observation="fixed answer")
 
     class FixedJudge:
-        def verify(self, *args, **kwargs):
+        def verify(self, *args: object, **kwargs: object) -> Verdict:
             calls["judge"] += 1
             return Verdict(label="PASS", score=1.0, raw="correct: yes\nconfidence: 100%")
 
@@ -142,4 +142,5 @@ async def test_real_pipeline_resume_reuses_agent_execution_and_final_judge(
         summaries.append(finalize_run(cfg, [task], executions, runner.adapters, tmp_path))
         assert calls == {"agent": 2, "judge": 1}
     assert summaries[0].benchmark == summaries[1].benchmark
+    assert summaries[-1].benchmark is not None
     assert summaries[-1].benchmark.values["accuracy"] == 1

@@ -41,6 +41,7 @@ def experiment_controls(cfg: ExperimentConfig, tasks: list[EvalTask]) -> dict[st
                 {
                     "name": t.name,
                     "data": t.data,
+                    "memory_instruction": t.memory_instruction,
                     "sessions": [
                         {"id": s.id, "query": s.query, "instruction": s.instruction} for s in t.sessions
                     ],

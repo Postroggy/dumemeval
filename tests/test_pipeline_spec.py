@@ -23,6 +23,7 @@ from dumemeval.pipeline.spec import EvalPipeline
 class Memory(BaseMemoryAdapter):
     def __init__(self) -> None:
         super().__init__(MemorySpec(name="none", type="none"))
+        self.observed_sessions: list[int] = []
 
     def setup(self, task: EvalTask) -> None:
         return None
@@ -41,6 +42,9 @@ class Memory(BaseMemoryAdapter):
 
     def observe(self, session: SessionSpec) -> list[MemoryOp]:
         return []
+
+    def observe_execution(self, session: SessionSpec, outcome: SessionOutcome) -> None:
+        self.observed_sessions.append(session.id)
 
 
 class Exec(SessionExecutor):
@@ -73,13 +77,8 @@ async def test_pipeline_composes_multi_session_transfer_without_benchmark_branch
             SessionSpec(id=2, instruction="read", memory_inject=True, query="read"),
         ],
     )
-    result = await EvalPipeline(
-        MemorySessionTransferProtocol(),
-        Memory(),
-        Exec(),
-        None,
-        None,
-        (),
-    ).run(task)
+    memory = Memory()
+    result = await EvalPipeline(MemorySessionTransferProtocol(), memory, Exec(), None, None, ()).run(task)
     assert len(result.execution.sessions) == 2
     assert result.benchmark is None
+    assert memory.observed_sessions == [1, 2]
