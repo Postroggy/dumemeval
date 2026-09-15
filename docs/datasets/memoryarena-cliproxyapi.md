@@ -86,7 +86,8 @@ Windows 上终止自有 worker 时记录退出码 1；独立的 cleanup_status �
 
 被取消的冷安装和失败的 Anthropic 后端尝试都是诊断产物，不是对照组。
 最终代理配置只覆盖 reasoning.effort=medium，实验性的摘要过滤已移除。
-根目录 PLAN.md 跟踪后续完整对照和外部资源场景的验收进展。
+验收状态与验证边界统一见随 Issue 交付的[验收记录](memoryarena-acceptance.md)和
+[修复复验说明](memoryarena-acceptance-fixes.md)，便于直接从仓库核对最终结果。
 
 ## 复现最小诊断运行
 
