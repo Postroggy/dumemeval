@@ -15,7 +15,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from dumemeval.datasets.benchmark import BenchmarkAdapter, BenchmarkData
+from dumemeval.datasets.benchmark import BenchmarkAdapter, BenchmarkData, register_benchmark
 from dumemeval.models import EvalTask, MemoryFact, SessionSpec
 
 from ._validation import take, validate_ids, validate_rounds
@@ -72,6 +72,7 @@ class MemoryArenaTravelData(BenchmarkData):
         return cls(samples=samples)
 
 
+@register_benchmark
 class MemoryArenaTravelAdapter(BenchmarkAdapter):
     """MemoryArena travel：agent multi-turn 规划 + 跨回合记忆。"""
 

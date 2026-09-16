@@ -7,6 +7,8 @@
 
 from typing import TYPE_CHECKING
 
+from dumemeval.benchmarks.memoryarena import metrics as _memoryarena  # noqa: F401
+
 if TYPE_CHECKING:
     from dumemeval.benchmarks.memoryarena.metrics import (
         MemoryArenaMathCalculator,

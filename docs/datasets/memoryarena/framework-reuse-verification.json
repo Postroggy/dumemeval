@@ -1,0 +1,57 @@
+{
+  "parent_commit": "3426dddc07d4ac4eebebb5d4a4a210ffc3a62530",
+  "upstream_commit": "37a0e1959e14509898fca856d8fd3fd2a720aefb",
+  "source_and_tests_sha256": "e44b5aecc1ec7de0a7713488455a1cd81cf7dc7db2a61eb9e671f8536d2029c2",
+  "changed_python_inputs_sha256": {
+    "src/dumemeval/benchmarks/memoryarena/datasets/__init__.py": "c97f8af566706a27b6ad7a5773b8e5ece3e6352bf9117e35f0e842afb19abbcf",
+    "src/dumemeval/benchmarks/memoryarena/datasets/reasoning.py": "36cdfc94b04e2c1d79de9ba53e836a3ef661bb6ea24fa13794896b04f10c1228",
+    "src/dumemeval/benchmarks/memoryarena/datasets/search.py": "08241d23d946eb84f736fb69036e6a575b1f483d0efaacf224954b6bebb1adf4",
+    "src/dumemeval/benchmarks/memoryarena/datasets/shopping.py": "e461ae19a4af6956015b2679748842c8b4d4baba8efc22e2bf3dcba6ade0d85c",
+    "src/dumemeval/benchmarks/memoryarena/datasets/travel.py": "fe3c04c3c62f16ee4fa32174cdcf2dc03ee2f05cbb33afc31ca6a8303016958a",
+    "src/dumemeval/benchmarks/memoryarena/environment/providers.py": "4ce9014142ece88e4b8ce4f8bd94430dc2fd2ee9bfbaccc1da6a25ec041b2545",
+    "src/dumemeval/benchmarks/memoryarena/metrics/__init__.py": "5f31592fc4c264b8513e7c25b30ae06aed8196bcdadf8b530a18e2987b134ddd",
+    "src/dumemeval/datasets/benchmark.py": "5effd4e3dd4681fe44a3e7a2fa39c8dca8aba808d6cbda6aba67ecdf9f30d873",
+    "src/dumemeval/datasets/benchmarks/__init__.py": "fa497b443ddcf056d4d998d43d32c260a96714653267197ac6e0efb675971e29",
+    "src/dumemeval/environments.py": "7f2bcb2eec0dd85b3ac35f2024a2cc0ac38fa870d7335f49ac142b3386d893e2",
+    "src/dumemeval/metrics/benchmarks/__init__.py": "4c8efb669074b69161e1de2859c6c30d6c8b3d7c50c04403739e154619ccabf0",
+    "src/dumemeval/metrics/core/registry.py": "32efede6c51b91e2c2034af041c5f54711bd2e4c242d01788be4b7c9f323f4e2",
+    "tests/benchmarks/memoryarena/test_layout.py": "cb2ab8e6aed801ae8e1aa473ebbb63da2e28b2e3be9846616f7f594aae40002a"
+  },
+  "current": {
+    "passed": 632,
+    "failed": 108,
+    "skipped": 13
+  },
+  "parent": {
+    "passed": 629,
+    "failed": 108,
+    "skipped": 13
+  },
+  "related": {
+    "passed": 232
+  },
+  "official_parity": {
+    "passed": 33
+  },
+  "new_failed_test_identities": [],
+  "resolved_failed_test_identities": [],
+  "mypy": {
+    "errors": 152,
+    "files": 31,
+    "same_diagnostics_as_parent": true
+  },
+  "dataset_registry_matches_upstream": true,
+  "historical_json_and_zip_files_unchanged": 17,
+  "historical_comparison": "ZIP bytes; JSON with Git LF normalization",
+  "ruff": "All checks passed!",
+  "format": "229 files already formatted",
+  "delivery": {
+    "wheel": "dumemeval-0.2.0-py3-none-any.whl",
+    "sha256": "c20f941eb80167e7c88044ee25f58d4781fb8307999cb32331ba0f901f278390",
+    "source_modules_checked": 154,
+    "isolated_import_and_override_checks": 8,
+    "agent_client_help": "passed",
+    "official_math_worker_lifecycle": "passed",
+    "paid_model_calls": 0
+  }
+}

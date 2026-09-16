@@ -16,7 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from dumemeval.datasets.benchmark import BenchmarkAdapter, BenchmarkData
+from dumemeval.datasets.benchmark import BenchmarkAdapter, BenchmarkData, register_benchmark
 from dumemeval.datasets.benchmarks._common import query_text
 from dumemeval.models import EvalTask, SessionSpec
 
@@ -42,6 +42,7 @@ class MemoryArenaShoppingData(BenchmarkData):
         return cls(samples=samples)
 
 
+@register_benchmark
 class MemoryArenaShoppingAdapter(BenchmarkAdapter):
     name = "memoryarena_shopping"
 

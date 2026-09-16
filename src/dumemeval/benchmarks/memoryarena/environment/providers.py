@@ -5,11 +5,16 @@ Source: https://github.com/ZexueHe/MemoryArena
 
 from pathlib import Path
 
-from dumemeval.environments import HttpTaskEnvironment, TaskEnvironmentProvider
+from dumemeval.environments import (
+    HttpTaskEnvironment,
+    TaskEnvironmentProvider,
+    register_task_environment,
+)
 from dumemeval.models import EvalTask, TaskEnvSpec
 from dumemeval.task_environments.base import EnvironmentPreparation, TaskEnvironmentRuntime
 
 
+@register_task_environment
 class WebshopTaskEnvironment(HttpTaskEnvironment):
     """MemoryArena 官方 webshop：HTTP env server + search[]/click[] 动作空间。
 
@@ -56,6 +61,7 @@ class WebshopTaskEnvironment(HttpTaskEnvironment):
         }
 
 
+@register_task_environment
 class MemoryArenaTaskEnvironment(TaskEnvironmentProvider):
     """Managed official MemoryArena tools, registered through the existing boundary.
 
@@ -85,6 +91,3 @@ class MemoryArenaTaskEnvironment(TaskEnvironmentProvider):
         from .runtime import MemoryArenaRuntime
 
         return MemoryArenaRuntime(task, ArenaRuntimeConfig.model_validate(spec.config), output_dir)
-
-
-PROVIDERS = (WebshopTaskEnvironment, MemoryArenaTaskEnvironment)

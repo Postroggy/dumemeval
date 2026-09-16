@@ -17,7 +17,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from dumemeval.datasets.benchmark import BenchmarkAdapter, BenchmarkData
+from dumemeval.datasets.benchmark import BenchmarkAdapter, BenchmarkData, register_benchmark
 from dumemeval.datasets.benchmarks._common import query_text
 from dumemeval.models import EvalTask, SessionSpec
 
@@ -104,9 +104,11 @@ class _FormalReasoningAdapter(BenchmarkAdapter):
         return tasks
 
 
+@register_benchmark
 class MemoryArenaMathAdapter(_FormalReasoningAdapter):
     name = "memoryarena_math"
 
 
+@register_benchmark
 class MemoryArenaPhysAdapter(_FormalReasoningAdapter):
     name = "memoryarena_phys"

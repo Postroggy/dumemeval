@@ -89,14 +89,6 @@ _PROVIDER_REGISTRY: dict[str, type[TaskEnvironmentProvider]] = {
 }
 
 
-@cache
-def _load_builtin_providers() -> None:
-    from .benchmarks.memoryarena.environment.providers import PROVIDERS
-
-    for cls in PROVIDERS:
-        _PROVIDER_REGISTRY.setdefault(cls.name, cls)
-
-
 def register_task_environment(cls: type[TaskEnvironmentProvider]) -> type[TaskEnvironmentProvider]:
     """注册环境 provider（扩展点）。"""
     if not getattr(cls, "name", None):
@@ -107,13 +99,11 @@ def register_task_environment(cls: type[TaskEnvironmentProvider]) -> type[TaskEn
 
 
 def task_environment_names() -> list[str]:
-    _load_builtin_providers()
     return list(_PROVIDER_REGISTRY)
 
 
 @cache
 def _provider_instance(name: str) -> TaskEnvironmentProvider:
-    _load_builtin_providers()
     cls = _PROVIDER_REGISTRY.get(name)
     if cls is None:
         raise ValueError(f"Unknown task environment: {name!r}. Supported: {task_environment_names()}")
@@ -132,3 +122,7 @@ def __getattr__(name: str) -> object:
 
         return getattr(providers, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+# Define the provider contract and registry before importing their implementations.
+from .benchmarks.memoryarena.environment import providers as _memoryarena  # noqa: E402, F401

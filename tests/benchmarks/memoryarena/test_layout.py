@@ -14,6 +14,9 @@ import pytest
         "dumemeval.benchmarks.memoryarena.metrics.travel",
         "dumemeval.benchmarks.memoryarena.environment.providers",
         "dumemeval.benchmarks.memoryarena.environment.runtime",
+        "dumemeval.datasets.benchmark",
+        "dumemeval.metrics.core.registry",
+        "dumemeval.environments",
     ],
 )
 def test_direct_import_and_registries_without_optional_worker_sdks(first: str, tmp_path: Path) -> None:
@@ -49,7 +52,7 @@ assert get_task_environment('memoryarena').name == 'memoryarena'
     )
 
 
-def test_lazy_builtins_preserve_previously_registered_overrides(tmp_path: Path) -> None:
+def test_registered_overrides_survive_registry_lookups(tmp_path: Path) -> None:
     script = """
 from dumemeval.datasets.benchmark import BenchmarkAdapter, get_benchmark, register_benchmark
 from dumemeval.metrics import MetricCalculator, get_benchmark_calculator, register_calculator

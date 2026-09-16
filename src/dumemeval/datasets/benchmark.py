@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from functools import cache
 from typing import Any, ClassVar
 
 from pydantic import BaseModel
@@ -98,14 +97,6 @@ class BenchmarkAdapter(ABC):
 _BENCHMARK_REGISTRY: dict[str, type[BenchmarkAdapter]] = {}
 
 
-@cache
-def _load_builtin_integrations() -> None:
-    from ..benchmarks.memoryarena.datasets import ADAPTERS
-
-    for cls in ADAPTERS:
-        _BENCHMARK_REGISTRY.setdefault(cls.name, cls)
-
-
 def register_benchmark(cls: type[BenchmarkAdapter]) -> type[BenchmarkAdapter]:
     """注册 benchmark 适配器（装饰器）。"""
     _BENCHMARK_REGISTRY[cls.name] = cls
@@ -114,7 +105,6 @@ def register_benchmark(cls: type[BenchmarkAdapter]) -> type[BenchmarkAdapter]:
 
 def get_benchmark(name: str) -> BenchmarkAdapter:
     """按名创建 benchmark 适配器实例。"""
-    _load_builtin_integrations()
     cls = _BENCHMARK_REGISTRY.get(name)
     if cls is None:
         raise ValueError(f"Unknown benchmark: {name!r}. Supported: {list(_BENCHMARK_REGISTRY)}")
@@ -123,5 +113,4 @@ def get_benchmark(name: str) -> BenchmarkAdapter:
 
 def benchmark_names() -> list[str]:
     """所有已注册的 benchmark 名。"""
-    _load_builtin_integrations()
     return list(_BENCHMARK_REGISTRY)
