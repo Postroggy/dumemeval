@@ -128,6 +128,8 @@ MemoryArena 另有 [Hermes 真实 on/off 与记忆通道验证](memoryarena-herm
 含固定版本复现入口、原生轨迹与脱敏证据包。
 Shopping 逐商品边界、实际提示/技能指纹和 Search 多次判分的当前修复见
 [PR #5 审查反例与回归](memoryarena-review-fixes.md)。
+旧报告缺少必需控制指纹时的校验与 Hermes 归档回归见
+[控制指纹完整性修复](memoryarena-control-completeness.md)。
 
 ## 未完成
 

@@ -1,0 +1,391 @@
+{
+  "date": "2026-09-16",
+  "parent_commit": "3f6dd636b67f16621b3259d4a439da538df968ce",
+  "scope": "Missing required control fingerprints must warn, including when both historical runs omit the same fields.",
+  "required_control_fields": [
+    "agent",
+    "agent_skills",
+    "code",
+    "dataset",
+    "judge",
+    "observed_prompts",
+    "runtime",
+    "task_environment",
+    "tasks"
+  ],
+  "before_fix_regressions": {
+    "failed": 9,
+    "passed": 1
+  },
+  "focused_checks": {
+    "passed": 32,
+    "failed": 0,
+    "skipped": 0
+  },
+  "checks": {
+    "previous_commit": "3f6dd636b67f16621b3259d4a439da538df968ce",
+    "upstream_commit": "37a0e1959e14509898fca856d8fd3fd2a720aefb",
+    "comparison_archive_sha256": "2b0c68c1d03b4ac5f06144f8987c0a15745adb2586f9e02be0df1b82fcc3c512",
+    "current": {
+      "passed": 613,
+      "failed": 108,
+      "skipped": 13
+    },
+    "previous": {
+      "passed": 603,
+      "failed": 108,
+      "skipped": 13
+    },
+    "upstream": {
+      "passed": 389,
+      "failed": 109,
+      "skipped": 13
+    },
+    "related": {
+      "passed": 203
+    },
+    "official_parity": {
+      "passed": 33
+    },
+    "new_regressions": {
+      "tests.test_control_completeness::test_absent_required_control_names_affected_runs[one-arm-observed_prompts]": "passed",
+      "tests.test_control_completeness::test_absent_required_control_names_affected_runs[one-arm-agent_skills]": "passed",
+      "tests.test_control_completeness::test_absent_required_control_names_affected_runs[both-arms-observed_prompts]": "passed",
+      "tests.test_control_completeness::test_absent_required_control_names_affected_runs[both-arms-agent_skills]": "passed",
+      "tests.test_control_completeness::test_empty_or_unobserved_required_control_is_unverified[]": "passed",
+      "tests.test_control_completeness::test_empty_or_unobserved_required_control_is_unverified[   ]": "passed",
+      "tests.test_control_completeness::test_empty_or_unobserved_required_control_is_unverified[not-observed]": "passed",
+      "tests.test_control_completeness::test_only_new_fields_do_not_satisfy_the_required_control_contract": "passed",
+      "tests.test_control_completeness::test_committed_hermes_reports_warn_without_changing_scores[math]": "passed",
+      "tests.test_control_completeness::test_committed_hermes_reports_warn_without_changing_scores[diagnostic]": "passed"
+    },
+    "new_failures_from_previous": [],
+    "new_failures_from_upstream": [],
+    "mypy": {
+      "current": 152,
+      "previous": 152,
+      "upstream": 173,
+      "same_as_previous": true,
+      "new_diagnostics": []
+    }
+  },
+  "hermes_recomparison": {
+    "archive_sha256": "edbd423d38963fefd4dde2862ee9f68be98b3a1dd549f564c216deff6b4fae60",
+    "model_calls": 0,
+    "scenes": {
+      "math": {
+        "input_hashes": {
+          "math/off/summary.json": "f0f3a78d8d2ee3ed0e1c989053432879b82161d40ab7faeefa32e1e1af225927",
+          "math/off/experiment_config.json": "9dc4a2a39feb112ba1e979c438740979da532f8f0d5d9e1e812498a674c8caef",
+          "math/on/summary.json": "5d3f2e5ada5cd3c789f0f845103fd0e561f54260f1f7041bd96d306b2a34c63a",
+          "math/on/experiment_config.json": "39997f23edbaf7529c6f3fcecdb3bd0f80d95915d172865f36400263ffa4e13c"
+        },
+        "warnings": [
+          "Required control fingerprints are missing for off: agent_skills, observed_prompts; experiment comparability is unverified",
+          "Required control fingerprints are missing for on: agent_skills, observed_prompts; experiment comparability is unverified"
+        ],
+        "deltas": [
+          {
+            "metric": "efficiency.cost_usd",
+            "direction": "lower_is_better",
+            "values": {
+              "off": 0.0,
+              "on": 0.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "efficiency.tokens_in",
+            "direction": "lower_is_better",
+            "values": {
+              "off": 0.0,
+              "on": 0.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "efficiency.tokens_out",
+            "direction": "lower_is_better",
+            "values": {
+              "off": 0.0,
+              "on": 0.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "memoryarena_math.avg_progress_score",
+            "direction": "higher_is_better",
+            "values": {
+              "off": 1.0,
+              "on": 1.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "memoryarena_math.is_correct",
+            "direction": "higher_is_better",
+            "values": {
+              "off": 1.0,
+              "on": 1.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "memoryarena_math.overall_average_passrate",
+            "direction": "higher_is_better",
+            "values": {
+              "off": 1.0,
+              "on": 1.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "trace.empty_output_rate",
+            "direction": "lower_is_better",
+            "values": {
+              "off": 0.0,
+              "on": 0.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "trace.error_rate",
+            "direction": "lower_is_better",
+            "values": {
+              "off": 0.0,
+              "on": 0.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "trace.memory_observation_coverage",
+            "direction": "higher_is_better",
+            "values": {
+              "off": 0.0,
+              "on": 1.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "trace.memory_tool_used_rate",
+            "direction": "higher_is_better",
+            "values": {
+              "off": null,
+              "on": 1.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "trace.trace_captured_rate",
+            "direction": "higher_is_better",
+            "values": {
+              "off": 1.0,
+              "on": 1.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "utility.success_rate",
+            "direction": "higher_is_better",
+            "values": {
+              "off": 1.0,
+              "on": 1.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "utility.turns",
+            "direction": "higher_is_better",
+            "values": {
+              "off": 2.0,
+              "on": 2.0
+            },
+            "baseline": "off"
+          }
+        ],
+        "matches_archived_math_deltas": true
+      },
+      "diagnostic": {
+        "input_hashes": {
+          "diagnostic/off/summary.json": "7527105dbac2a7b22b63db2dc2c8f8a906040df501a42dbcc8da69bc467eebc4",
+          "diagnostic/off/experiment_config.json": "330721bc1d38f27db15462e2a816a25daf98fd81b605c2cd8248cc83b39cb0ec",
+          "diagnostic/on/summary.json": "2f51cd0295e60971d74d944e3153aeaa4d8fada10e75902af5867892025c487a",
+          "diagnostic/on/experiment_config.json": "a154dca4bd3ec8d83084ca01fac57ca12dd51c47ff77686725ca9fb475e61f0c"
+        },
+        "warnings": [
+          "Required control fingerprints are missing for off: agent_skills, observed_prompts; experiment comparability is unverified",
+          "Required control fingerprints are missing for on: agent_skills, observed_prompts; experiment comparability is unverified"
+        ],
+        "deltas": [
+          {
+            "metric": "efficiency.cost_usd",
+            "direction": "lower_is_better",
+            "values": {
+              "off": 0.0,
+              "on": 0.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "efficiency.tokens_in",
+            "direction": "lower_is_better",
+            "values": {
+              "off": 0.0,
+              "on": 0.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "efficiency.tokens_out",
+            "direction": "lower_is_better",
+            "values": {
+              "off": 0.0,
+              "on": 0.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "trace.empty_output_rate",
+            "direction": "lower_is_better",
+            "values": {
+              "off": 0.0,
+              "on": 0.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "trace.error_rate",
+            "direction": "lower_is_better",
+            "values": {
+              "off": 0.0,
+              "on": 0.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "trace.memory_observation_coverage",
+            "direction": "higher_is_better",
+            "values": {
+              "off": 0.0,
+              "on": 1.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "trace.memory_tool_used_rate",
+            "direction": "higher_is_better",
+            "values": {
+              "off": null,
+              "on": 1.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "trace.trace_captured_rate",
+            "direction": "higher_is_better",
+            "values": {
+              "off": 1.0,
+              "on": 1.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "utility.success_rate",
+            "direction": "higher_is_better",
+            "values": {
+              "off": 1.0,
+              "on": 1.0
+            },
+            "baseline": "off"
+          },
+          {
+            "metric": "utility.turns",
+            "direction": "higher_is_better",
+            "values": {
+              "off": 2.0,
+              "on": 2.0
+            },
+            "baseline": "off"
+          }
+        ],
+        "matches_archived_math_deltas": null
+      }
+    },
+    "archived_math_warnings": [],
+    "historical_archive_unchanged": true
+  },
+  "ruff": "passed",
+  "format": {
+    "status": "passed",
+    "files": 217
+  },
+  "git_diff_check": "passed",
+  "documentation_powershell_syntax": "passed",
+  "model_calls": 0,
+  "inputs": {
+    "docs/datasets/README.md": {
+      "git_blob_sha256": "eb2328f2d86e74eabf7a1ab0ca0ad748b967a4a63a16fd758ba5aef9eb0094d5",
+      "working_tree_sha256": "499fd9d35046a3f2c3de53141ce44bfc2ba434cd96751203018313e27cb74d72"
+    },
+    "docs/datasets/memoryarena-control-completeness.md": {
+      "git_blob_sha256": "b832e128df7fa0a2e229a9d4520b42a323f37c12d6a98f3bbe3a72363b5befa3",
+      "working_tree_sha256": "b832e128df7fa0a2e229a9d4520b42a323f37c12d6a98f3bbe3a72363b5befa3"
+    },
+    "docs/datasets/memoryarena-review-fixes.md": {
+      "git_blob_sha256": "f48517273dfb4130ebd95bce9d4d380f12a67b0e92d765bcb3afb8b681e23a71",
+      "working_tree_sha256": "f48517273dfb4130ebd95bce9d4d380f12a67b0e92d765bcb3afb8b681e23a71"
+    },
+    "src/dumemeval/comparison/service.py": {
+      "git_blob_sha256": "cc8de32a9cc3e7f539a474c8e82d12cdfdfa4078e2440da37b113964659aedb6",
+      "working_tree_sha256": "c0a747b0e32a3a06f34d770f0b9344c0b8175d5852b26ef42cccca6b0a33cccb"
+    },
+    "tests/test_comparison.py": {
+      "git_blob_sha256": "68ab06b2b7031d2674336c3efca22682f45248dbf5ea95427b4811a4b179bd8d",
+      "working_tree_sha256": "fd4faf9e24327f89a1cb0e71824061fb9e6764a2cd0b591453a3f6598eb38c41"
+    },
+    "tests/test_control_completeness.py": {
+      "git_blob_sha256": "97e6cb02f3f58814af2fa89653a4da14e45a5d9e473a462631d4742bc4b21cf9",
+      "working_tree_sha256": "97e6cb02f3f58814af2fa89653a4da14e45a5d9e473a462631d4742bc4b21cf9"
+    },
+    "tests/test_experiment_controls.py": {
+      "git_blob_sha256": "308fdbcc6de7a9e3e0fae564120f5db90cab6fad80d1b594bc2a305bba77e476",
+      "working_tree_sha256": "308fdbcc6de7a9e3e0fae564120f5db90cab6fad80d1b594bc2a305bba77e476"
+    },
+    "tests/test_memoryarena_review_regressions.py": {
+      "git_blob_sha256": "ae8e8d53aa0dec71f6c17da20890c2b19cce82ae5fc2e4d8048684fceeef16bf",
+      "working_tree_sha256": "ae8e8d53aa0dec71f6c17da20890c2b19cce82ae5fc2e4d8048684fceeef16bf"
+    }
+  },
+  "input_hash_semantics": "git_blob_sha256 describes the canonical Git inputs; working_tree_sha256 includes local line endings. Previous 27-file input hashes remain scoped to 3f6dd63.",
+  "evidence": {
+    "file": "memoryarena-control-completeness-evidence.zip",
+    "sha256": "9b1cb4c3bc5a421c7366de86bd32c597a78002ba57bee56c101c53dcecfad6e1",
+    "members": {
+      "checks/before.log": "b0f02c47f8d087696e233b18c3600c7cec6d350902ca8cfba38ac8db729760d3",
+      "checks/focused.log": "bb7f0babc0a59837ee46a34c849fffed446efb9ac3c306b31f206f418700de81",
+      "checks/focused.xml": "007e2943a7b03bf3fff6f09e9ae694a959690a2f82cfad7ce201dc5575cd814d",
+      "checks/pytest-current.log": "c7865004ae087dd002346028b5ed5af8857b6e235bb13510e8dc985fdad7d9e6",
+      "checks/pytest-current.xml": "32fd439540668a0a40d8ffaf752615e5082c5896504f9b18880eac50ec32a54a",
+      "checks/mypy-current.log": "7a50f94aeb2c323e0f5161e28d75bebe392b5235ddf45022c59b8b7716e7d9e3",
+      "checks/ruff.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "checks/format.log": "d05c0280a19426e07f212d7f92b01fa368423f6d58445c9cd7c94542fd26843b",
+      "checks/diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "checks/verification.json": "3049aaa032e27bdae4c7ddf38439554c0e40770470ce2b41fdd6b34a7ca6f6b9",
+      "recheck_hermes.py": "b176e9e9c1bfbbb141e83f4b5f0e5005791d192336a8219b45ca03c3a8d1dbf7",
+      "verify_checks.py": "9447e07cef8e90b789546207e51278c6151f01df40cf77b58ee0ed78cba070d2",
+      "hermes/math/comparison.json": "55c4b3c7c27bf4ce03357f9de64d1186e2dfd871908c99c42f2adc9851053ee8",
+      "hermes/math/comparison.md": "31f3c4e31a7e8dcf9c89e9cb883d4919f96a4c5774d5739b850cd3019a991848",
+      "hermes/diagnostic/comparison.json": "1a3bb4eabc93cac325f01faf885c986e8a074f9aefac46f0e8baaa23fee35445",
+      "hermes/diagnostic/comparison.md": "b886350350c1e604dd6c3dc64ff28806bd1ae6cff1d52b0780dde820be5de833",
+      "hermes/verification.json": "1f232ae2e6d48174d32d123b53ef40e631d3127d23a167b2989edb0fab41a4ed"
+    },
+    "credential_values_redacted": true,
+    "local_roots_replaced": true
+  },
+  "limits": [
+    "Full repository tests and mypy retain verified upstream failures.",
+    "Previous and upstream check logs reused from the committed review evidence archive.",
+    "No new model run, full-dataset run or memory-gain claim.",
+    "Local verification does not constitute an external GitHub review or CI result."
+  ]
+}

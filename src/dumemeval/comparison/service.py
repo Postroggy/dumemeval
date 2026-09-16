@@ -30,6 +30,22 @@ _LOWER_IS_BETTER = (
     "tokens_out",
 )
 
+# Minimum evidence for every completed run, independent of the benchmark.
+# Legacy reports remain readable, but absent fields cannot establish comparability.
+_REQUIRED_CONTROLS = frozenset(
+    (
+        "tasks",
+        "dataset",
+        "agent",
+        "agent_skills",
+        "judge",
+        "runtime",
+        "task_environment",
+        "code",
+        "observed_prompts",
+    )
+)
+
 
 def direction_of(metric: str) -> MetricDirection:
     """按指标名判定方向（cost/latency/幻觉/错误率等越低越好）。"""
@@ -111,15 +127,20 @@ def comparability_warnings(runs: list[RunRef]) -> list[str]:
     warnings: list[str] = []
 
     fingerprints = [ref.provenance.controls if ref.provenance else {} for ref in runs]
+    for ref, fields in zip(runs, fingerprints, strict=True):
+        missing = sorted(key for key in _REQUIRED_CONTROLS if not fields.get(key, "").strip())
+        if missing:
+            warnings.append(
+                f"Required control fingerprints are missing for {ref.label}: {', '.join(missing)}; "
+                "experiment comparability is unverified"
+            )
     if any("not-observed" in fields.values() for fields in fingerprints):
         warnings.append(
             "Actual agent/environment/prompt/skill evidence is missing; runtime comparability is unverified"
         )
     if any("not-controlled" in fields.values() for fields in fingerprints):
         warnings.append("Upstream environment randomness is not controlled; seed equivalence is unverified")
-    if any(not fields for fields in fingerprints):
-        warnings.append("Controlled-input fingerprints are missing; experiment comparability is unverified")
-    else:
+    if all(fingerprints):
         keys = set().union(*(set(fields) for fields in fingerprints))
         for key in sorted(keys):
             if len({fields.get(key) for fields in fingerprints}) > 1:

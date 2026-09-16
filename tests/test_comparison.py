@@ -175,7 +175,18 @@ class TestComparabilityWarnings:
         for ref in refs:
             assert ref.provenance is not None
             ref.provenance.controls = dict.fromkeys(
-                ("tasks", "dataset", "agent", "judge", "runtime", "task_environment", "code"), "same-fixture"
+                (
+                    "tasks",
+                    "dataset",
+                    "agent",
+                    "agent_skills",
+                    "judge",
+                    "runtime",
+                    "task_environment",
+                    "code",
+                    "observed_prompts",
+                ),
+                "same-fixture",
             )
         cmp_result = compare_runs(refs)
         assert cmp_result.warnings == []

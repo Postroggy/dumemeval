@@ -6,7 +6,7 @@ from typing import Any, Literal
 import pytest
 
 from dumemeval.adapters.registry import create_adapter
-from dumemeval.artifacts.controls import experiment_controls
+from dumemeval.artifacts.controls import experiment_controls, observed_controls
 from dumemeval.comparison.service import comparability_warnings
 from dumemeval.execution.executor import SessionExecutor
 from dumemeval.lifecycle.memory_transfer import MemoryTransfer
@@ -154,11 +154,11 @@ async def test_comparison_agrees_with_actual_protocol_instructions(
         ]
         save_task_result(tmp_path / label, result)
         prompts.append(executor.instructions)
-        runs.append(_run(label, experiment_controls(cfg, [task])))
+        controls = experiment_controls(cfg, [task])
+        controls["observed_prompts"] = observed_controls(tmp_path / label)["observed_prompts"]
+        runs.append(_run(label, controls))
     assert (prompts[0] == prompts[1]) == (policy == "none")
     assert bool(comparability_warnings(runs)) == (prompts[0] != prompts[1])
-    from dumemeval.artifacts.controls import observed_controls
-
     assert (
         observed_controls(tmp_path / "on")["observed_prompts"]
         == observed_controls(tmp_path / "off")["observed_prompts"]
@@ -299,7 +299,7 @@ def test_same_path_skill_content_changes_control(tmp_path: Path) -> None:
     before = _run("before", experiment_controls(cfg, [cfg.to_eval_task()]))
     skill.write_text("Never search.", encoding="utf-8")
     after = _run("after", experiment_controls(cfg, [cfg.to_eval_task()]))
-    assert comparability_warnings([before, after])
+    assert any("differs: agent_skills;" in warning for warning in comparability_warnings([before, after]))
 
 
 @pytest.mark.parametrize("answers,expected", [(["yes", "yes", "no"], 1), (["no", "no", "yes"], 0)])

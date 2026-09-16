@@ -41,12 +41,12 @@ def test_changed_effective_prompt_policy_warns(policy: Literal["location", "proa
     # The adapter's effective task is authoritative even if the config is unchanged.
     task.memory_instruction = policy
     changed = _run("changed", experiment_controls(cfg, [task]))
-    assert comparability_warnings([original, changed]) == [
-        "Controlled input differs: tasks; this comparison is not a controlled ablation"
-    ]
+    warnings = comparability_warnings([original, changed])
+    assert "Controlled input differs: tasks; this comparison is not a controlled ablation" in warnings
+    assert any("observed_prompts" in warning and "unverified" in warning for warning in warnings)
 
 
-def test_matched_prompt_on_off_remains_comparable() -> None:
+def test_matched_configuration_without_observed_prompts_is_unverified() -> None:
     on = _config()
     off = on.model_copy(deep=True)
     off.experiment.protocol = "test_only"
@@ -55,4 +55,7 @@ def test_matched_prompt_on_off_remains_comparable() -> None:
         _run(label, experiment_controls(cfg, [cfg.to_eval_task()]))
         for label, cfg in [("on", on), ("off", off)]
     ]
-    assert comparability_warnings(runs) == []
+    warnings = comparability_warnings(runs)
+    assert len(warnings) == 2
+    assert all("observed_prompts" in warning and "unverified" in warning for warning in warnings)
+    assert not any("differs" in warning for warning in warnings)
