@@ -9,9 +9,9 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import dumemeval.datasets.benchmarks  # noqa: F401  触发注册
+from dumemeval.benchmarks.memoryarena.datasets.travel import MemoryArenaTravelData
 from dumemeval.datasets import benchmark_names, get_benchmark
 from dumemeval.datasets.benchmarks.locomo import LoCoMoAdapter, LoCoMoData
-from dumemeval.datasets.benchmarks.memoryarena_travel import MemoryArenaTravelData
 from dumemeval.evaluation import CalculatorBenchmarkScorer
 from dumemeval.metrics.benchmarks.locomo import locomo_f1
 from dumemeval.metrics.core.base import MetricInput

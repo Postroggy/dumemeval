@@ -11,6 +11,10 @@
   `docs/architecture/ci.md`。
 - **`examples/user_preference.yaml`**：bind mount 改为相对路径，去掉本机绝对路径。
 
+- **MemoryArena 按数据集族归档**：实现集中到 `dumemeval.benchmarks.memoryarena`，测试与验收材料分别进入 `tests/benchmarks/memoryarena/`、`docs/datasets/memoryarena/`。配置和 CLI 名称保持兼容，顶层计算器及 Webshop provider 导出保留。
+  内部导入路径迁移：`datasets.benchmarks.memoryarena_<scene>` → `benchmarks.memoryarena.datasets.<scene>`；`metrics.benchmarks.memoryarena*` → `benchmarks.memoryarena.metrics.*`（原 `memoryarena.py` 为 `travel.py`）；受管环境实现 → `benchmarks.memoryarena.environment.*`（HTTP 客户端为 `client.py`，Arena 配置为 `config.py`）。`task_environments.prepare.prepare_environment` 继续作为通用入口。
+  运行时控制字段使用 `EnvironmentControls`；旧产物缺少该字段时标为未验证。历史 JSON/ZIP 保持原始字节，其路径和哈希对应原提交。详见[目录与扩展边界](docs/datasets/memoryarena/layout.md)。
+
 ### Fixed
 - **MemoryAgentBench ingest 粒度**：不再把整段 `context` 塞进一个 session。按官方
   `chunk_text_into_sentences`（tiktoken gpt-4o-mini，默认 chunk_size=4096）切块，

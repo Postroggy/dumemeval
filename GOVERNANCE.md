@@ -91,7 +91,7 @@ flowchart BT
 - **MemoryArena Shopping**：正式分数要求 host 采集的环境购买记录；没有记录时为未测，
   不再从 agent 文本提及的 ASIN 推导购买成功。截断样本不报告完整 bundle 的 overall_success。
   默认按官方单商品环境独立评分，前一商品错误不影响后一商品的正确性；整包成功仍要求全部正确。
-  接入状态与剩余工作见 [MemoryArena 设计](docs/datasets/memoryarena.md)。
+  接入状态与剩余工作见 [MemoryArena 设计](docs/datasets/memoryarena/README.md)。
 - **MemoryArena Search 多次判分**：`num_runs>1` 是显式多数票扩展；accuracy 使用聚合判定，
   `judge_score` 保留通过比例，并记录逐次原文。不要将末次回答替代多数票，也不要与单次判分混报。
 

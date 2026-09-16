@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable, Sequence
+from functools import cache
 from typing import Any, Literal, cast
 
 from .base import MetricCalculator
@@ -16,9 +17,18 @@ JudgeFn = Callable[[str, str, str], bool]
 
 _REGISTRY: dict[str, type[MetricCalculator]] = {}
 _ALIASES: dict[str, str] = {
-    "memoryarena": "memoryarena_travel",
     "memdaily": "memsim",
 }
+
+
+@cache
+def _load_builtin_integrations() -> None:
+    from ...benchmarks.memoryarena.metrics import ALIASES, CALCULATORS
+
+    for cls in CALCULATORS:
+        _REGISTRY.setdefault(cls.name, cls)
+    for alias, cls in ALIASES.items():
+        _REGISTRY.setdefault(alias, cls)
 
 
 def register_calculator(cls: type[MetricCalculator], *aliases: str) -> type[MetricCalculator]:
@@ -33,6 +43,7 @@ def register_calculator(cls: type[MetricCalculator], *aliases: str) -> type[Metr
 
 def calculator_names() -> list[str]:
     """已注册的规范名（按 ClassVar name 去重）。"""
+    _load_builtin_integrations()
     return sorted({cls.name for cls in _REGISTRY.values()})
 
 
@@ -57,6 +68,7 @@ def get_benchmark_calculator(
     llm_config: dict[str, Any] | None = None,
 ) -> MetricCalculator:
     """按数据集名创建计算器。只把 ``__init__`` 声明过的参数传进去。"""
+    _load_builtin_integrations()
     key = _ALIASES.get(name.strip().lower(), name.strip().lower())
     cls = _REGISTRY.get(key)
     if cls is None:

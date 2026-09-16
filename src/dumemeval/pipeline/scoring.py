@@ -24,7 +24,7 @@ def scoring_context(judge: dict[str, Any], dataset: object, output_dir: Path) ->
     root = Path(__file__).resolve().parents[1]
     sources = {
         str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
-        for module in ("evaluation", "metrics", "verifier", "models")
+        for module in ("evaluation", "metrics", "verifier", "models", "benchmarks")
         for path in sorted((root / module).rglob("*.py"))
     }
     for relative in ("pipeline/scoring.py", "core/retry.py", "core/config.py"):

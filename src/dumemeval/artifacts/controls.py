@@ -7,8 +7,11 @@ import json
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from ..core.config import ExperimentConfig
 from ..models import EvalTask
+from ..models.environment import EnvironmentControls
 from .redaction import redact_config
 
 
@@ -92,29 +95,26 @@ def skill_contents(directory: str | None) -> dict[str, str]:
     }
 
 
-def observed_controls(output_dir: Path) -> dict[str, str]:
+def observed_controls(
+    output_dir: Path, *, expected_environment_tasks: set[str] | None = None
+) -> dict[str, str]:
     """Fingerprint observed implementations without ephemeral ports or task handles."""
-    environments = []
+    environments: list[EnvironmentControls] = []
+    incomplete = False
     for path in sorted((output_dir / "environments").glob("*/runtime.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
-        environments.append(
-            {
-                key: data.get(key)
-                for key in (
-                    "revision",
-                    "environment_source_sha256",
-                    "env_name",
-                    "environment_state",
-                    "seed",
-                    "seed_policy",
-                    "python",
-                    "fastapi",
-                    "uvicorn",
-                    "assets",
-                    "packages",
-                )
-            }
-        )
+        try:
+            control = EnvironmentControls.model_validate(data.get("controls", {}))
+        except ValidationError:
+            incomplete = True
+            continue
+        incomplete |= not control.fingerprint
+        environments.append(control)
+    task_ids = {control.task_id for control in environments}
+    incomplete |= len(task_ids) != len(environments)
+    if expected_environment_tasks is not None:
+        incomplete |= task_ids != expected_environment_tasks
+    environments.sort(key=lambda control: control.task_id)
     agents = []
     for path in sorted((output_dir / "trials").glob("*/agent/trajectory.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -136,7 +136,11 @@ def observed_controls(output_dir: Path) -> dict[str, str]:
             }
         )
     return {
-        "observed_environment": digest(environments) if environments else "not-observed",
+        "observed_environment": (
+            digest([control.model_dump() for control in environments])
+            if environments and not incomplete
+            else "not-observed"
+        ),
         "observed_agent": digest(agents) if agents else "not-observed",
         "observed_prompts": (
             digest(instructions)
@@ -145,9 +149,5 @@ def observed_controls(output_dir: Path) -> dict[str, str]:
             and all(item["instruction_sha256"] for task in instructions for item in task["sessions"])
             else "not-observed"
         ),
-        **(
-            {"environment_seed": "not-controlled"}
-            if any(item.get("seed_policy") == "upstream_wall_clock_seed" for item in environments)
-            else {}
-        ),
+        **{key: "not-controlled" for control in environments for key in control.uncontrolled},
     }

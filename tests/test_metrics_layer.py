@@ -8,6 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from dumemeval.benchmarks.memoryarena.metrics.travel import judge_round
 from dumemeval.evaluation import CalculatorBenchmarkScorer
 from dumemeval.execution.executor import SessionOutcome
 from dumemeval.metrics import (
@@ -21,7 +22,6 @@ from dumemeval.metrics import (
     register_calculator,
 )
 from dumemeval.metrics.benchmarks.locomo import locomo_f1, locomo_f1_multi, score_locomo_f1
-from dumemeval.metrics.benchmarks.memoryarena import judge_round
 from dumemeval.models import AgentOutput, EvalTask, MemoryFact, MemoryOp, TaskExecution
 
 

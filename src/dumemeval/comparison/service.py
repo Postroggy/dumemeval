@@ -134,12 +134,17 @@ def comparability_warnings(runs: list[RunRef]) -> list[str]:
                 f"Required control fingerprints are missing for {ref.label}: {', '.join(missing)}; "
                 "experiment comparability is unverified"
             )
-    if any("not-observed" in fields.values() for fields in fingerprints):
-        warnings.append(
-            "Actual agent/environment/prompt/skill evidence is missing; runtime comparability is unverified"
-        )
-    if any("not-controlled" in fields.values() for fields in fingerprints):
-        warnings.append("Upstream environment randomness is not controlled; seed equivalence is unverified")
+    for state, description in (
+        ("not-observed", "Control evidence was not observed"),
+        ("not-controlled", "Control factors are not controlled"),
+    ):
+        for ref, fields in zip(runs, fingerprints, strict=True):
+            affected = sorted(key for key, value in fields.items() if value == state)
+            if affected:
+                warnings.append(
+                    f"{description} for {ref.label}: {', '.join(affected)}; "
+                    "experiment comparability is unverified"
+                )
     if all(fingerprints):
         keys = set().union(*(set(fields) for fields in fingerprints))
         for key in sorted(keys):

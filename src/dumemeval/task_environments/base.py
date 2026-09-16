@@ -10,6 +10,13 @@ from ..models import SessionOutcome, SessionSpec
 from ..models.execution import RuntimeMount
 
 
+class EnvironmentPreparation(BaseModel):
+    """Common preparation status; providers may add their own diagnostic fields."""
+
+    ready: bool = False
+    missing: list[str] = Field(default_factory=list)
+
+
 class EnvironmentBinding(BaseModel):
     """Only agent-visible resources; grading references never belong here."""
 

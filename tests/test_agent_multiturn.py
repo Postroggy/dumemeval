@@ -9,9 +9,9 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import dumemeval.datasets.benchmarks  # noqa: F401
+from dumemeval.benchmarks.memoryarena.datasets.reasoning import MemoryArenaMathAdapter, MemoryArenaPhysAdapter
+from dumemeval.benchmarks.memoryarena.datasets.search import MemoryArenaSearchAdapter
 from dumemeval.datasets import get_benchmark
-from dumemeval.datasets.benchmarks.memoryarena_reasoning import MemoryArenaMathAdapter, MemoryArenaPhysAdapter
-from dumemeval.datasets.benchmarks.memoryarena_search import MemoryArenaSearchAdapter
 from dumemeval.metrics import get_benchmark_calculator, outputs_from_execution
 from dumemeval.metrics.benchmarks.streammembench import token_overlap_score
 from dumemeval.metrics.core.base import MetricInput
@@ -103,7 +103,7 @@ class TestMemoryArenaShopping:
         assert a.metrics() == ["match_ground_truth", "overall_success", "attribute_match"]
 
     def test_subset_and_max_questions(self) -> None:
-        from dumemeval.datasets.benchmarks.memoryarena_shopping import MemoryArenaShoppingAdapter
+        from dumemeval.benchmarks.memoryarena.datasets.shopping import MemoryArenaShoppingAdapter
 
         raw = [
             *SHOPPING_RAW,

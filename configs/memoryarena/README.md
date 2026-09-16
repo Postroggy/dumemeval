@@ -3,18 +3,18 @@
 五个场景配置都通过常规 `dumemeval run` 入口使用已注册的受管环境和 Harbor，
 每个配置选取一条完整源数据。独立的 `cliproxyapi-smoke.yaml` 已通过
 GPT-5.5 medium 的真实两问题 Math 诊断，设置和证据见
-[CLIProxyAPI 联调说明](../../docs/datasets/memoryarena-cliproxyapi.md)。
+[CLIProxyAPI 联调说明](../../docs/datasets/memoryarena/cliproxyapi.md)。
 `cliproxyapi-memory-smoke.yaml` 提供独立的合成文件持久化探针。
 完整两轮 `controlled-math.yaml` 对照实验及依赖外部资源的官方工具通信检查也已通过，
-见 [本地验收记录](../../docs/datasets/memoryarena-acceptance.md)。
+见 [本地验收记录](../../docs/datasets/memoryarena/acceptance.md)。
 
 Hermes 0.21.3 的同样本真实 on/off 复跑和随机标记记忆诊断也已通过。
 配置、兼容入口、固定镜像构建和脱敏证据见
-[Hermes 验收与复现](../../docs/datasets/memoryarena-hermes.md)。
+[Hermes 验收与复现](../../docs/datasets/memoryarena/hermes.md)。
 
 ## 安装与准备
 
-新环境先阅读 [从零安装指南](../../docs/datasets/memoryarena-clean-setup.md)，
+新环境先阅读 [从零安装指南](../../docs/datasets/memoryarena/clean-setup.md)，
 其中包含完整 Windows 步骤：代理登录、固定版本 Agent 镜像和隔离依赖环境，
 不依赖作者机器上的私有安装。
 
@@ -58,7 +58,7 @@ search-bm25.yaml 是已经验证的官方 BM25 选项，不需要 embedding 端�
 ## 运行 on/off 两组
 
 如需复现已验证、提示词完全相同的对照实验，使用 controlled-math.yaml 并按
-[验收指南](../../docs/datasets/memoryarena-acceptance.md) 操作。
+[验收指南](../../docs/datasets/memoryarena/acceptance.md) 操作。
 下方通用示例还会改变记忆指令后缀，因此改变的实验因素更多。
 
 Docker 必须运行。框架管理的官方服务在临时端口启动，结束后自动清理，
@@ -130,11 +130,11 @@ Shopping 上游启动器以系统时间为随机种子初始化。
 
 ## 本地检查
 
-    uv run pytest tests/test_memoryarena_contracts.py tests/test_memoryarena_client.py tests/test_memoryarena_cli.py tests/test_memoryarena_official_parity.py tests/test_memoryarena_runtime.py tests/test_memoryarena_completion.py
+    uv run pytest tests/benchmarks/memoryarena/test_contracts.py tests/benchmarks/memoryarena/test_client.py tests/benchmarks/memoryarena/test_cli.py tests/benchmarks/memoryarena/test_official_parity.py tests/benchmarks/memoryarena/test_runtime.py tests/benchmarks/memoryarena/test_completion.py
 
 进行官方评分比较和 HTTP 集成测试前，将 MEMORYARENA_REFERENCE 指向固定版本的检出目录。
 CLI 测试使用自编固定样例和显式 mock 执行；一致性测试在固定输入上运行官方函数。
 HTTP 测试启动真实 Math/Phys 服务，通过真实 socket 调用挂载工具脚本，
 judge 使用确定性的本地固定样例。这些测试均不等同于真实 Harbor/LLM 实验。
 缺少依赖或官方源码时，可选检查会明确跳过。
-验收状态见校验清单和 [接入设计](../../docs/datasets/memoryarena.md)。
+验收状态见校验清单和 [接入设计](../../docs/datasets/memoryarena/README.md)。

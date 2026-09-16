@@ -19,7 +19,7 @@ from dumemeval.models import BenchmarkResult, MemorySpec, SessionOutcome, Sessio
 from dumemeval.pipeline import finalize_run
 from dumemeval.pipeline.scoring import CheckpointedScorer, ScoringCheckpointError, scoring_context
 from dumemeval.verifier.base import Verdict
-from tests.test_memoryarena_search_scoring import search_task
+from tests.benchmarks.memoryarena.test_search_scoring import search_task
 
 
 def score_input() -> MetricInput:
@@ -88,6 +88,28 @@ def test_judge_environment_fallback_is_part_of_identity(
     first = scoring_context({}, {}, tmp_path)
     monkeypatch.setenv("JUDGE_MODEL", "second-model")
     assert scoring_context({}, {}, tmp_path) != first
+
+
+def test_dataset_owned_scorer_change_invalidates_cached_score(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dumemeval.benchmarks.memoryarena.metrics import search
+
+    scorer_path = Path(search.__file__).resolve()
+    original_read = Path.read_bytes
+    scorer = CounterScorer()
+    first = scoring_context({}, {}, tmp_path)
+    checkpoint(scorer, tmp_path / "scores", **first).score(score_input())
+
+    def changed_code(path: Path) -> bytes:
+        data = original_read(path)
+        return data + b"\n# changed calculator implementation\n" if path.resolve() == scorer_path else data
+
+    monkeypatch.setattr(Path, "read_bytes", changed_code)
+    changed = scoring_context({}, {}, tmp_path)
+    assert changed["sources"] != first["sources"]
+    checkpoint(scorer, tmp_path / "scores", **changed).score(score_input())
+    assert scorer.calls == 2
 
 
 @pytest.mark.parametrize("damage", ["json", "checksum"])
