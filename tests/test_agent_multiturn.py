@@ -128,7 +128,10 @@ class TestMemoryArenaShopping:
         assert task.benchmark == "memoryarena_shopping"
         assert len(task.sessions) == 2
         assert "Buy almond flour B00TUDFEW2" in task.sessions[0].instruction
-        assert "search[" in task.sessions[0].instruction
+        # Tool entry points belong to the selected environment, not the task template.
+        for session in task.sessions:
+            for entry in ("TASK_ENV_URL", "WEBSHOP_ENV_URL", "arena_tool.py", "search[", "click["):
+                assert entry not in session.instruction
         assert task.task_environment.get("type") == "webshop"
         assert a.metrics() == ["match_ground_truth", "overall_success"]
 

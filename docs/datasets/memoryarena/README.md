@@ -53,6 +53,8 @@ flowchart LR
 通用协议、工具网关、Agent 工具客户端保留在 `task_environments/`。
 包初始化沿用已有注册入口；查询函数只查注册表。包导入不启动服务或提前加载可选 SDK。
 核心主循环没有按 MemoryArena 场景名称增加分支，四个场景策略承接差异，Math/Phys 共用推理策略。
+Shopping 任务模板只描述购买目标和真实购买约束；具体工具入口、环境变量和调用格式由所选环境提供，
+避免外部 webshop 的说明混入受管运行时。
 
 <a id="scenarios"></a>
 

@@ -157,7 +157,19 @@ if ($LASTEXITCODE -ne 0) { throw 'Image build failed' }
 $controlImageId = docker image inspect $env:MEMORYARENA_CONTROL_IMAGE --format '{{.Id}}'
 docker run --rm $env:MEMORYARENA_CONTROL_IMAGE claude --version
 # 检查 Docker 到宿主机的路由：未携带客户端密钥时应返回 401。
-docker run --rm $env:MEMORYARENA_CONTROL_IMAGE python -c 'import urllib.request, urllib.error; exec("try:\n urllib.request.urlopen(\"http://host.docker.internal:8317/v1/models\", timeout=5)\nexcept urllib.error.HTTPError as e:\n assert e.code == 401\n print(\"Docker proxy routing OK (401)\")")'
+# 通过标准输入传递脚本，避免 Windows PowerShell 5.1 的参数引号解析差异。
+@'
+import urllib.error
+import urllib.request
+
+try:
+    with urllib.request.urlopen("http://host.docker.internal:8317/v1/models", timeout=5):
+        raise RuntimeError("Expected HTTP 401 from the unauthenticated proxy")
+except urllib.error.HTTPError as error:
+    if error.code != 401:
+        raise
+    print("Docker proxy routing OK (401)")
+'@ | docker run --rm -i $env:MEMORYARENA_CONTROL_IMAGE python -
 if ($LASTEXITCODE -ne 0) { throw 'Docker proxy routing failed' }
 ```
 

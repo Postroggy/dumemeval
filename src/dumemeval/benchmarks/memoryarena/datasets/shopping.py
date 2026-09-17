@@ -103,8 +103,7 @@ def _shopping_instruction(goal: str, step: int, n_steps: int) -> str:
     """把官方任务目标交给 agent，并强制走 webshop 动作，而不是在文本里假装购买。"""
     return (
         f"这是 bundled_shopping 第 {step}/{n_steps} 个购买步骤。\n"
-        "你必须通过任务环境（TASK_ENV_URL / WEBSHOP_ENV_URL）完成购买："
-        "每回合只输出一个 search[...] 或 click[...] 动作，直到 click[Buy Now]。\n"
+        "你必须通过任务环境提供的工具完成实际购买，并以环境返回的购买结果为准。\n"
         "不要编造 ASIN，不要在没有 env 观测的情况下声称已购买。\n"
         "本步目标：\n\n"
         f"{goal}"
