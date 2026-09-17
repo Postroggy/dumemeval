@@ -51,7 +51,8 @@ class ReportGenerator:
         redactor = Redactor(dict(os.environ))
         if formats in ("json", "json+md"):
             (run_dir / "result.json").write_text(
-                redactor.text(json.dumps(payload, indent=2, ensure_ascii=False, default=str)), encoding="utf-8"
+                redactor.text(json.dumps(payload, indent=2, ensure_ascii=False, default=str)),
+                encoding="utf-8",
             )
         if formats in ("md", "json+md"):
             (run_dir / "report.md").write_text(redactor.text("\n".join(markdown)), encoding="utf-8")
@@ -129,9 +130,7 @@ class ReportGenerator:
                 f"| {outcome.session_id} | {state} | {measured} | {(outcome.error or '').replace('|', '/')} |"
             )
         artifacts = {
-            key: str(path)
-            for outcome in result.execution.sessions
-            for key, path in outcome.artifacts.items()
+            key: str(path) for outcome in result.execution.sessions for key, path in outcome.artifacts.items()
         }
         if artifacts:
             lines += ["", "## Artifacts", ""] + [f"- {key}: `{path}`" for key, path in artifacts.items()]

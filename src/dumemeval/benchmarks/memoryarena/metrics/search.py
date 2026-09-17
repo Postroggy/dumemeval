@@ -37,7 +37,7 @@ class MemoryArenaSearchCalculator(MetricCalculator):
 
     name: ClassVar[str] = "memoryarena_search"
     kind: ClassVar[MetricKind] = "benchmark"
-    metrics: ClassVar[tuple[str, ...]] = ("is_correct",)
+    metrics: ClassVar[tuple[str, ...]] = ("accuracy", "confidence")
 
     def __init__(self, judge: JudgeFn | None = None, llm_config: dict[str, Any] | None = None):
         self._judge = judge
@@ -45,6 +45,8 @@ class MemoryArenaSearchCalculator(MetricCalculator):
         self._llm_config = llm_config
 
     def calculate(self, inp: MetricInput) -> MetricBundle:
+        if inp.task is None:
+            return MetricBundle(name=self.name, kind=self.kind)
         rounds = list(round_items(inp))
         source_count = int(inp.task.data.get("source_round_count", len(rounds)))
         detail: dict[str, Any] = {

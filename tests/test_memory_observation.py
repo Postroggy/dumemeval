@@ -76,6 +76,7 @@ def test_file_change_then_correlated_read_across_sessions(tmp_path: Path) -> Non
     assert [(e.session_id, e.source) for e in events] == [(1, "file_hash_change"), (2, "atif_read_result")]
     assert events[0].evidence["before_sha256"] is None
     assert len(events[0].evidence["after_sha256"]) == 64
+    assert [event.op for event in events] == ["add", "search"]
 
 
 @pytest.mark.parametrize(
@@ -116,3 +117,26 @@ def test_missing_trajectory_keeps_observed_file_change(tmp_path: Path) -> None:
         session, SessionOutcome(session_id=1, success=False, trial_dir=str(tmp_path / "absent"))
     )
     assert [op.op for op in adapter.observe(session)] == ["inject", "add"]
+
+
+def test_observation_error_is_diagnostic_not_memory_use(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    adapter, task = _adapter(tmp_path)
+    session = task.sessions[0]
+    adapter.inject(session, {})
+
+    def unreadable() -> dict[str, str]:
+        raise OSError("fixture permission failure")
+
+    monkeypatch.setattr(adapter, "_file_hashes", unreadable)
+    adapter.observe_execution(session, SessionOutcome(session_id=1, success=True))
+    assert [op.op for op in adapter.observe(session)] == ["inject", "observation_unavailable"]
+    execution = TaskExecution(
+        task_id=task.name, task_name=task.name, memory_backend="directory", memory_ops=adapter.all_ops()
+    )
+    report = MetricsAggregator([TraceCalculator()]).run(MetricInput(task=task, execution=execution))
+    assert report.trace is not None
+    assert report.trace.memory_tool_used is None
+    assert report.trace.memory_read_ops is None
+    assert report.trace.memory_write_ops is None

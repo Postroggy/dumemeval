@@ -65,6 +65,7 @@ def test_changed_inputs_invalidate_previous_score(tmp_path: Path, field: str) ->
     checkpoint(scorer, tmp_path, judge="v1", sources="v1", dataset="v1").score(inp)
     context = {"judge": "v1", "sources": "v1", "dataset": "v1"}
     if field == "evidence":
+        assert inp.execution is not None
         inp.execution.sessions.append(SessionOutcome(session_id=1, observation="changed"))
     else:
         context[field] = "v2"

@@ -192,13 +192,16 @@ class MemoryArenaTravelCalculator(MetricCalculator):
 
     name: ClassVar[str] = "memoryarena_travel"
     kind: ClassVar[MetricKind] = "benchmark"
+    metrics: ClassVar[tuple[str, ...]] = ("round_success", "slot_accuracy")
 
     def __init__(self, judgement_mode: JudgementMode = "hint"):
         self.judgement_mode = judgement_mode
 
     def calculate(self, inp: MetricInput) -> MetricBundle:
         task = inp.task
-        data = task.data if task is not None and isinstance(task.data, dict) else {}
+        if task is None:
+            return MetricBundle(name=self.name, kind=self.kind)
+        data = task.data if isinstance(task.data, dict) else {}
         mode = inp.extra.get("judgement_mode") or data.get("judgement_mode") or self.judgement_mode
         if mode not in ("hint", "answer", "none"):
             mode = "hint"
@@ -211,7 +214,7 @@ class MemoryArenaTravelCalculator(MetricCalculator):
             n += 1
             outcome = outcome_for_round(inp, idx)
             evidence = outcome.environment if outcome else None
-            managed = inp.task.task_environment.get("type") == "memoryarena"
+            managed = task.task_environment.get("type") == "memoryarena"
             if (managed and (evidence is None or evidence.reward is None)) or (
                 outcome and not outcome.success
             ):

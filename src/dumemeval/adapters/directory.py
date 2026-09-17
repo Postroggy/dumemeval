@@ -172,7 +172,7 @@ class DirectoryMemoryAdapter(BaseMemoryAdapter):
                     self._ops.append(
                         MemoryOp(
                             session_id=session.id,
-                            op="retrieve",
+                            op="search",
                             timestamp=time.time(),
                             source="atif_read_result",
                             evidence={

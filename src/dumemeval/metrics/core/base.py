@@ -187,6 +187,8 @@ def prediction_for_item(outputs: list[AgentOutput], query: str, index: int) -> s
 
 def outcome_for_round(inp: MetricInput, index: int) -> SessionOutcome | None:
     """Resolve a scored round by session identity, excluding context-only sessions."""
+    if inp.task is None:
+        return None
     sessions = [session for session in inp.task.sessions if session.query is not None]
     if index >= len(sessions):
         return None
@@ -204,7 +206,7 @@ def round_items(inp: MetricInput) -> Iterator[tuple[int, Any, str, Any, str]]:
     data = inp.task.data if inp.task is not None and isinstance(inp.task.data, dict) else {}
     questions = data.get("questions") or []
     answers = data.get("answers") or []
-    sessions = [session for session in inp.task.sessions if session.query is not None]
+    sessions = [session for session in inp.task.sessions if session.query is not None] if inp.task else []
     by_session = {
         sample.session_id: sample.response for sample in inp.samples if sample.session_id is not None
     }

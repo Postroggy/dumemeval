@@ -218,6 +218,8 @@ def test_shopping_exact_purchase_rule_matches_official(official_root: Path, purc
     env._normalize_expected_asins = lambda gold: methods["_normalize_expected_asins"](env, gold)
     official = methods["_build_judgement"](env, env.task_def["target_products"])
     inp = shopping_input(evidence=True)
+    assert inp.execution is not None
+    assert inp.task is not None
     last = inp.execution.sessions[-1].environment
     assert last is not None
     last.info["purchased_asins"] = list(purchased)
@@ -242,6 +244,8 @@ def test_shopping_per_product_and_bundle_match_official_runner(
     official.update(get_product_name_from_catalog=lambda asin: asin, format_feedback=lambda *args: "")
     enrich = definitions(official_root / "run_shopping.py", {"enrich_task_result"})["enrich_task_result"]
     inp = shopping_input(evidence=True)
+    assert inp.execution is not None
+    assert inp.task is not None
     steps = []
     for index, purchased in enumerate(purchases):
         evidence = inp.execution.sessions[index].environment

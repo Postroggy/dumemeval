@@ -20,6 +20,7 @@ from dumemeval.execution.executor import SessionExecutor
 from dumemeval.lifecycle.memory_transfer import MemoryTransfer
 from dumemeval.lifecycle.runner import SessionRunner
 from dumemeval.metrics.core.base import MetricInput, round_items
+from dumemeval.metrics.core.registry import get_benchmark_calculator
 from dumemeval.models import EvalTask, MemorySpec, SampleResult, SessionOutcome, SessionSpec, TaskExecution
 from dumemeval.models.environment import EnvironmentEvidence
 
@@ -36,6 +37,27 @@ ADAPTERS = {
 def raw_case(name: str) -> list[dict[str, Any]]:
     cases: dict[str, list[dict[str, Any]]] = json.loads(FIXTURES.read_text(encoding="utf-8"))
     return cases[name]
+
+
+@pytest.mark.parametrize("name", ADAPTERS)
+def test_optional_metric_input_does_not_fabricate_scores(name: str) -> None:
+    calculator = get_benchmark_calculator(f"memoryarena_{name}")
+    assert calculator.calculate(MetricInput()).values == {}
+    assert list(round_items(MetricInput())) == []
+
+
+@pytest.mark.parametrize(
+    "name,expected",
+    [
+        ("shopping", ["match_ground_truth", "overall_success"]),
+        ("travel", ["round_success", "slot_accuracy"]),
+        ("search", ["accuracy", "confidence"]),
+        ("math", ["is_correct", "avg_progress_score", "overall_average_passrate"]),
+        ("phys", ["is_correct", "avg_progress_score", "overall_average_passrate"]),
+    ],
+)
+def test_public_metric_names_match_official_contract(name: str, expected: list[str]) -> None:
+    assert ADAPTERS[name]().metrics() == expected
 
 
 @pytest.mark.parametrize("name", ADAPTERS)
@@ -147,6 +169,7 @@ def test_shopping_cumulative_purchases_and_incomplete_bundle() -> None:
     inp = shopping_input(evidence=True)
     result = MemoryArenaShoppingCalculator().calculate(inp)
     assert result.values == {"match_ground_truth": 1, "overall_success": 1}
+    assert inp.task is not None
     inp.task.data["source_round_count"] = 3
     assert "overall_success" not in MemoryArenaShoppingCalculator().calculate(inp).values
 

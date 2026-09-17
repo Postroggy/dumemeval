@@ -108,6 +108,11 @@ Search 多次 judge 记录多数票结果及各次原文，不能用最后一次
 
 ## 兼容与迁移
 
+接入已对齐 `master` 的 `TaskExecution` / `MetricInput` / `TaskResult` 契约。评分输入没有任务时不产生指标；
+Shopping 与 Search 只有文本输出、没有执行证据时保持未测。Search 只判最终综合问题，不能沿用逐问题平均的旧断言。
+计算器通过 `metrics` 声明实际可报告的指标。目录记忆读取映射到框架操作 `search`；
+`observation_unavailable` 保留观测失败诊断且不计入读写，缺少观测仍不能推断为零次使用。
+
 注册名称、别名、CLI/YAML、顶层 `dumemeval.metrics` 计算器和 `dumemeval.environments.WebshopTaskEnvironment` 保持兼容。
 用户注册覆盖和直接导入子模块有回归检查。内部路径迁移如下；旧证据内的路径/哈希属于其记录版本。
 

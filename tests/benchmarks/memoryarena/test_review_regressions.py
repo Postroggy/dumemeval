@@ -24,6 +24,7 @@ from tests.test_experiment_controls import _config, _run
 @pytest.mark.parametrize("first", ["B000000099", None])
 def test_wrong_or_missing_first_purchase_does_not_poison_later_round(first: str | None) -> None:
     inp = shopping_input(evidence=True)
+    assert inp.execution is not None
     purchases = [] if first is None else [first]
     for index, values in enumerate([purchases, [*purchases, "B000000002"]]):
         evidence = inp.execution.sessions[index].environment
@@ -226,6 +227,7 @@ async def test_shopping_new_episode_keeps_protocol_memory(
         ),
     )
     task = shopping_input(evidence=True).task
+    assert task is not None
     config = ArenaRuntimeConfig(reference=tmp_path / "reference", env_name="webshop")
     runtime = runtime_module.MemoryArenaRuntime(task, config, tmp_path / "run")
     memory = tmp_path / "persistent"

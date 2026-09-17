@@ -102,13 +102,15 @@ class MemoryArenaShoppingCalculator(MetricCalculator):
 
     name: ClassVar[str] = "memoryarena_shopping"
     kind: ClassVar[MetricKind] = "benchmark"
-    metrics: ClassVar[tuple[str, ...]] = ("match_ground_truth", "overall_success", "attribute_match")
+    metrics: ClassVar[tuple[str, ...]] = ("match_ground_truth", "overall_success")
 
     def calculate(self, inp: MetricInput) -> MetricBundle:
+        if inp.task is None:
+            return MetricBundle(name=self.name, kind=self.kind)
         details: list[dict[str, Any]] = []
         answers = inp.task.data.get("answers", [])
         sessions = [session for session in inp.task.sessions if session.query is not None]
-        outcomes = {outcome.session_id: outcome for outcome in inp.execution.sessions}
+        outcomes = {outcome.session_id: outcome for outcome in inp.outcomes}
         previous: dict[str, list[str]] = {}
         flags: list[float] = []
         for idx, session in enumerate(sessions):

@@ -60,7 +60,9 @@ class MemoryMount(RuntimeMount):
     read_only: bool = False
 
 
-MemoryOpName = Literal["setup", "inject", "snapshot", "add", "replace", "remove", "search"]
+MemoryOpName = Literal[
+    "setup", "inject", "snapshot", "add", "replace", "remove", "search", "observation_unavailable"
+]
 MEMORY_WRITE_OPS: frozenset[str] = frozenset({"add", "replace", "remove"})
 MEMORY_READ_OPS: frozenset[str] = frozenset({"search"})
 
@@ -70,6 +72,7 @@ class MemoryOp(BaseModel):
 
     ``op`` 是框架词表，不是产品 API 名。adapter 必须在记录时映射过来：
     写入类用 add/replace/remove，检索用 search；setup/inject/snapshot 是框架动作。
+    observation_unavailable 只记录观测失败，不计入读写操作。
     """
 
     session_id: int = Field(ge=0)
