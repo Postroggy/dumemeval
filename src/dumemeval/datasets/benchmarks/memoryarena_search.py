@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, JsonValue
 
 from ...metrics.benchmarks.locomo import JudgeFn
 from ...models import EvalTask, SessionSpec
@@ -21,8 +21,8 @@ from ._common import query_text
 
 class SearchSample(BaseModel):
     id: int = 0
-    questions: list[Any] = Field(default_factory=list)
-    answers: list[Any] = Field(default_factory=list)
+    questions: list[JsonValue] = Field(default_factory=list)
+    answers: list[JsonValue] = Field(default_factory=list)
 
 
 class MemoryArenaSearchData(BenchmarkData):
