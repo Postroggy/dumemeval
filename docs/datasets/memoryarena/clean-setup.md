@@ -345,14 +345,15 @@ Math/Phys 所选 backend 还需要对应 SDK：OpenAI/OpenRouter 为 openai，An
 
 设置 `MEMORYARENA_REFERENCE` 后运行；官方 HTTP 测试使用真实本地服务和确定性 judge，不调用付费模型。
 没有官方源码或可选依赖时会跳过相应检查，不能据此声称 parity 通过。
+仓库与 GitHub 的统一门禁为 `make ci`（含打包、示例及四臂 mock smoke）；下面列出 PowerShell 检查命令。
 
 ```powershell
 & $python -m pytest tests/benchmarks/memoryarena tests/test_environment_extensions.py tests/test_experiment_controls.py tests/test_control_completeness.py tests/test_memory_observation.py tests/test_scoring_checkpoint.py tests/test_verifier_clients.py -q
 & $python -m ruff check src tests
 & $python -m ruff format --check src tests
-# 全仓检查包含已记录的上游失败，详情见验收报告。
+# Windows 的 3 项平台断言差异及新上游复现结果见验收报告。
 & $python -m pytest tests -m 'not e2e' -q
-& $python -m mypy src tests --no-incremental
+& $python -m mypy
 uv build --python $python --out-dir .cache/memoryarena-dist
 git diff --check
 ```

@@ -1,8 +1,8 @@
 {
   "issue": "https://github.com/Postroggy/dumemeval/issues/4",
   "documentation_consolidation_date": "2026-09-17",
-  "implementation_commit": "f3fdd925842dc98dda667a6ee28a06b0ac656ac8",
-  "upstream_commit": "37a0e1959e14509898fca856d8fd3fd2a720aefb",
+  "implementation_commit": "1a132d02e8867dd4e17efc45d30f8b0619eb71b6",
+  "upstream_commit": "1b48fc3e54e8282f00b710083ee24e6f12b14c70",
   "historical_hermes_run_commit": "909e185d043d04db1b5c21df1b610eef52fa0c1c",
   "recorded_checks": {
     "date": "2026-09-16",
@@ -29,7 +29,9 @@
     "installed_source_modules_verified": 154,
     "isolated_import_and_registry_checks": 8,
     "installed_official_math_worker_lifecycle": "passed",
-    "evidence": "evidence/checks.zip: f3fdd92/ and baseline/"
+    "evidence": "evidence/checks.zip: f3fdd92/ and baseline/",
+    "implementation_commit": "f3fdd925842dc98dda667a6ee28a06b0ac656ac8",
+    "upstream_commit": "37a0e1959e14509898fca856d8fd3fd2a720aefb"
   },
   "real_runs": {
     "sample": "Math row 39, paper 2507.18621, two questions",
@@ -81,9 +83,9 @@
       "members": 175
     },
     "evidence/checks.zip": {
-      "sha256": "fe97fd79799d073259eee2b8334032e7d98f96cc57d13b373882361cefeadaf1",
-      "bytes": 114679,
-      "members": 35
+      "sha256": "a3e533d0acb00166e1e80aa6de90729a6c83835af73aa4c13c6bf83b0647ee04",
+      "bytes": 161303,
+      "members": 53
     }
   },
   "documentation_checks": {
@@ -111,5 +113,113 @@
     "ruff_changed_test": "passed",
     "format_changed_test": "passed",
     "model_calls": 0
+  },
+  "rebase_checks": {
+    "date": "2026-09-17",
+    "implementation_commit": "1a132d02e8867dd4e17efc45d30f8b0619eb71b6",
+    "upstream_commit": "1b48fc3e54e8282f00b710083ee24e6f12b14c70",
+    "pre_rebase_head": "9e85d686479a4eb872aa5643730d31934fdadab3",
+    "platform": "Windows / Python 3.12.11",
+    "source_and_tests_sha256": "d632ac23a8b5f73016685ce3a94afcb7b746c0c5ce45c990d5b86f8d627b6cf4",
+    "source_hash_normalization": "LF line endings; sorted git-tracked src, tests, pyproject.toml and uv.lock paths",
+    "full_non_e2e": {
+      "passed": 748,
+      "failed": 3,
+      "skipped": 13
+    },
+    "official_parity_passed_in_full_suite": 33,
+    "windows_failures_reproduced_on_upstream": [
+      "tests.test_harbor_bridge.TestTrialConfigBuilder::test_basic_config",
+      "tests.test_orchestration.TestTaskDirGenerator::test_generate_structure",
+      "tests.test_run_index.TestWriteRunIndex::test_index_marks_complete_with_trials"
+    ],
+    "new_failed_test_identities": [],
+    "ruff": "passed",
+    "format": "229 files passed",
+    "mypy": "228 source files passed; zero errors",
+    "wheel_and_sdist": "passed",
+    "example_and_mock_smokes": [
+      {
+        "config": "examples/locomo_mini.yaml",
+        "command": [
+          "-m",
+          "dumemeval",
+          "run",
+          "--config",
+          "examples/locomo_mini.yaml",
+          "--mock",
+          "--no-resume"
+        ],
+        "exit_code": 0
+      },
+      {
+        "config": "examples/user_preference.yaml",
+        "command": [
+          "-m",
+          "dumemeval",
+          "run",
+          "--config",
+          "examples/user_preference.yaml",
+          "--mock",
+          "--no-resume"
+        ],
+        "exit_code": 0
+      },
+      {
+        "config": "configs/smoke/locomo_transfer.yaml",
+        "command": [
+          "-m",
+          "dumemeval",
+          "run",
+          "--config",
+          "configs/smoke/locomo_transfer.yaml",
+          "--mock",
+          "--no-resume"
+        ],
+        "exit_code": 0
+      },
+      {
+        "config": "configs/smoke/locomo_test_only.yaml",
+        "command": [
+          "-m",
+          "dumemeval",
+          "run",
+          "--config",
+          "configs/smoke/locomo_test_only.yaml",
+          "--mock",
+          "--no-resume"
+        ],
+        "exit_code": 0
+      },
+      {
+        "config": "configs/smoke/shopping_transfer.yaml",
+        "command": [
+          "-m",
+          "dumemeval",
+          "run",
+          "--config",
+          "configs/smoke/shopping_transfer.yaml",
+          "--mock",
+          "--no-resume"
+        ],
+        "exit_code": 0
+      },
+      {
+        "config": "configs/smoke/shopping_test_only.yaml",
+        "command": [
+          "-m",
+          "dumemeval",
+          "run",
+          "--config",
+          "configs/smoke/shopping_test_only.yaml",
+          "--mock",
+          "--no-resume"
+        ],
+        "exit_code": 0
+      }
+    ],
+    "independent_conflict_and_contract_review": "passed",
+    "model_calls": 0,
+    "evidence": "evidence/checks.zip: rebase-1b48fc3/"
   }
 }

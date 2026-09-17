@@ -4,8 +4,8 @@
 设计与官方差异见 [README](README.md)，复跑命令见[运行指南](clean-setup.md)，版本与哈希见
 [sources.json](sources.json) 和 [verification.json](verification.json)。
 
-实现检查对应 `f3fdd92`；真实模型材料对应更早的执行版本，后续修改由回归与官方对照验证。
-2026-09-17 的整理合并文档和检查附件、更新证据路径，没有重新运行模型或全仓检查。
+实现已 rebase 到 `master` 的 `1b48fc3`，以下当前检查对应 `1a132d0`。
+2026-09-17 重新验证全仓测试、官方对照、lint、打包和 mock 示例；真实模型材料仍属于其原始执行版本。
 以下是交付方的验证记录，最终验收由维护者完成。
 
 ## 验收清单
@@ -57,19 +57,24 @@ Hermes 的真实记录对应 `909e185`。Claude 记录保留执行时源码指�
 
 ## 代码检查与上游基线
 
-以下为 2026-09-16、Windows / Python 3.12.11 对 `f3fdd92` 的已归档检查；上游为 `37a0e19`。
+2026-09-17，Windows / Python 3.12.11；当前实现 `1a132d0`，上游 `1b48fc3`。
 
-| 检查 | 实现结果 | 上游基线 / 说明 |
-| --- | --- | --- |
-| 非 e2e 全仓测试 | 632 通过、108 失败、13 跳过 | 上游 389/109/13；失败身份无新增，修复了一个 CLI 测试。 |
-| 相关子集 | 232 通过 | 包含 33 项官方源码对照，不重复计数。 |
-| mypy | 152 条错误、31 个文件 | 上游 173 条；按文件、诊断内容与次数比较无新增。 |
-| Ruff / 格式 | 通过 / 229 文件通过 | 全仓测试和 mypy 仍未全绿。 |
-| wheel / sdist / 安装产物 | 构建通过，154 源码模块核对一致 | 8 项仓库外导入/注册检查、客户端入口、真实官方 Math worker 生命周期通过。 |
+| 检查 | 结果与范围 |
+| --- | --- |
+| 非 e2e 全仓测试 | 748 通过、3 失败、13 跳过；3 项失败均在新上游同环境原样复现，无新增失败。 |
+| 官方源码对照 | 33 项通过，已包含在全仓统计中。 |
+| Ruff / 格式 / mypy | 全部通过；格式覆盖 229 文件，mypy 检查 228 文件、0 错误。 |
+| wheel / sdist | 构建通过。 |
+| 示例与 mock smoke | locomo_mini、user_preference 及 locomo/shopping × transfer/test_only 共 6 组通过。 |
 
-上游检查使用已归档的固定提交同环境日志。2026-09-17 再次直接比较当前归档和上游归档，
-108 项失败均在上游出现，152 条类型诊断没有新增；没有重新跑上游全仓。
-本次文档整理的链接、命令语法、证据哈希和受影响回归结果记录在 `verification.json` 的 `documentation_checks`。
+Windows 的 3 项失败分别是 Harbor 路径分隔符、POSIX 执行位、索引路径后缀断言；
+独立检出新上游、确认导入基线源码后复现，并核对测试函数 AST 与失败断言一致。
+GitHub 的 Linux 检查执行仓库统一 `make ci`，状态以 PR Checks 为准。
+
+`checks.zip` 的 `rebase-1b48fc3/` 保存本次原始日志、JUnit、源码哈希、基线复现及摘要。
+`f3fdd92/` 与 `baseline/` 中的旧记录（632 通过/108 失败、152 条 mypy 错误）仅用于历史追溯，
+不能继续作为当前提交的检查结果。此前的安装产物和真实模型记录保留原始版本边界。
+文档整理检查仍记录在 `verification.json` 的 `documentation_checks`，本次结果在 `rebase_checks`。
 
 <a id="evidence"></a>
 
@@ -79,7 +84,7 @@ Hermes 的真实记录对应 `909e185`。Claude 记录保留执行时源码指�
 | --- | --- |
 | [claude-and-tools.zip](evidence/claude-and-tools.zip) | `results/memoryarena/controlled-final-20260915/` 的 on/off、comparison、原生/ATIF/环境轨迹、快照；`official-assets-20260915/` 的三个外部资源场景。 |
 | [hermes.zip](evidence/hermes.zip) | `math/validation.json`、`math/{on,off}/`、`math/prompts/`；`diagnostic/` 与首次 401 失败材料分开。 |
-| [checks.zip](evidence/checks.zip) | `f3fdd92/` 最终功能检查日志；`baseline/` 上游日志；`setup/` 安装验证；`environment-probes/shopping/` 逐商品环境证据；`historical-recomparison/` 旧报告缺失字段警告。 |
+| [checks.zip](evidence/checks.zip) | `rebase-1b48fc3/` 当前检查与 Windows 基线；`f3fdd92/` 历史功能检查；`baseline/` 上游日志；`setup/` 安装验证；`environment-probes/shopping/` 逐商品环境证据；`historical-recomparison/` 旧报告缺失字段警告。 |
 | [verification.json](verification.json) | 三个 ZIP 的 SHA-256、结果摘要、历史提交、对照复核与本次整理检查。 |
 
 前两份 ZIP 与原提交字节一致；`checks.zip` 合并保留最终检查和必要基线记录，`origins.json` 给出原档案成员及哈希。
