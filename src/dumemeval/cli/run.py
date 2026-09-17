@@ -11,7 +11,7 @@ from typing import Any
 from ..config.loader import load_config
 from ..core.config import ExperimentConfig
 from ..execution.executor import SessionExecutor
-from ..models import MemorySpec, RunSummary
+from ..models import EvalTask, MemorySpec, RunSummary, TaskExecution
 
 
 def cmd_run(args: argparse.Namespace) -> int:
@@ -53,9 +53,9 @@ def _preflight(cfg: ExperimentConfig, args: argparse.Namespace) -> None:
 
 def _run_tasks(
     cfg: ExperimentConfig,
-    tasks: list[Any],
+    tasks: list[EvalTask],
     args: argparse.Namespace,
-) -> tuple[list[Any], dict[str, Any]]:
+) -> tuple[list[TaskExecution], dict[str, Any]]:
     """并行执行所有 task，返回 (results, per-task adapters)。
 
     task 间并行、task 内 session 串行；adapters 是 runner 实际创建并 setup 过的
@@ -94,8 +94,8 @@ def _run_tasks(
 
 def _finalize(
     cfg: ExperimentConfig,
-    tasks: list[Any],
-    results: list[Any],
+    tasks: list[EvalTask],
+    results: list[TaskExecution],
     adapters: dict[str, Any],
     args: argparse.Namespace,
 ) -> None:
@@ -151,7 +151,7 @@ def _apply_overrides(cfg: ExperimentConfig, args: argparse.Namespace) -> None:
         cfg.judging.save_model_input = True
 
 
-def _build_tasks(cfg: ExperimentConfig) -> list[Any]:
+def _build_tasks(cfg: ExperimentConfig) -> list[EvalTask]:
     """配置占位 sessions；声明 benchmark 时由适配器 build_tasks 覆盖。"""
     if not (cfg.task.benchmark and cfg.task.data is not None):
         return [cfg.to_eval_task()]
@@ -290,8 +290,9 @@ def rule_qa_judge(pred: str, gold: str, question: str) -> bool:
 # ── 终端摘要 ────────────────────────────────────────────────────────────────
 
 
-def _print_summary(summary: RunSummary, results: list[Any], *, used_mock: bool) -> None:
-    print(f"\n✅ 评测完成: {summary.n_tasks} 个 task / memory={results[0].memory_backend}")
+def _print_summary(summary: RunSummary, results: list[TaskExecution], *, used_mock: bool) -> None:
+    backend = results[0].memory_backend if results else ""
+    print(f"\n✅ 评测完成: {summary.n_tasks} 个 task / memory={backend}")
     for task in summary.per_task:
         ok = task.n_success == task.n_sessions and task.n_sessions > 0
         mark = "🟢" if ok else "🔴"
@@ -302,11 +303,7 @@ def _print_summary(summary: RunSummary, results: list[Any], *, used_mock: bool) 
     if used_mock:
         print("   ⚠️  mock 模式：observation 是占位文本（无真实 agent 输出），")
         print("      指标仅用于验证编排链路，不代表 agent 真实水平。")
-    elif results and all(
-        not str(rec.get("observation") or "").strip()
-        for r in results
-        for rec in getattr(r, "session_outcomes", [o.model_dump() for o in getattr(r, "sessions", [])])
-    ):
+    elif results and all(not (session.observation or "").strip() for r in results for session in r.sessions):
         print("   ⚠️  所有 session 的 agent 输出为空（未采集到 trajectory.json），")
         print("      依赖输出的 benchmark 指标会算 0 分，请检查 agent 是否正常运行。")
 

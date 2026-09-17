@@ -1,6 +1,6 @@
 """Run 级模型：整批评测摘要、溯源、跨 run 比较。
 
-与 ``models/__init__.py`` 里的 task 级结果（EvalResult 及三维指标）分层：
+与 ``models/results.py`` 里的 task 级结果（TaskResult / MetricReport）分层：
 这里是「一次 run」和「多次 run 之间」的概念。不依赖 core/ 或其他层，避免成环。
 """
 

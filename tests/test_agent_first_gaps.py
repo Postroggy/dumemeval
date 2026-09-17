@@ -21,8 +21,9 @@ from dumemeval.execution.executor import SessionExecutor
 from dumemeval.execution.task_dir import TaskDirGenerator
 from dumemeval.lifecycle.memory_transfer import MemoryTransfer
 from dumemeval.lifecycle.runner import SessionRunner
+from dumemeval.metrics.core.base import MetricInput
 from dumemeval.metrics.dimensions.utility import UtilityEvaluator
-from dumemeval.models import EvalResult, EvalTask, MemorySpec, SessionSpec, TaskEnvSpec
+from dumemeval.models import EvalTask, MemorySpec, SessionSpec, TaskEnvSpec, TaskExecution
 
 # ── 公共构件 ────────────────────────────────────────────────────────────────
 
@@ -143,44 +144,60 @@ class TestMemoryInstruction:
 
 
 class TestUtilityOfficialBackfill:
-    def _result(self, successes: list[bool]) -> EvalResult:
-        return EvalResult(
-            task_name="t",
-            memory_backend="m",
-            session_outcomes=[
-                {"session_id": i + 1, "success": s, "observation": "ok"} for i, s in enumerate(successes)
-            ],
-        )
-
     def test_official_score_overrides_completion(self) -> None:
         """3/3 session 完成（完成率 1.0）但官方分 0.0 → task_success=False。"""
-        outcomes = _outcomes([True, True, True])
-        ur = UtilityEvaluator().evaluate(self._result([True, True, True]), outcomes, official_task_score=0.0)
-        assert ur.task_success is False
-        assert ur.success_rate == 1.0  # 完成率语义不变
-        assert ur.details[-1]["source"] == "benchmark_official"
+        bundle = UtilityEvaluator().calculate(
+            MetricInput(
+                execution=TaskExecution(
+                    task_id="t",
+                    task_name="t",
+                    memory_backend="m",
+                    sessions=_outcomes([True, True, True]),
+                ),
+                extra={"official_task_score": 0.0},
+            )
+        )
+        assert bundle.values["task_success"] == 0.0
+        assert bundle.values["success_rate"] == 1.0
+        assert bundle.details[-1]["source"] == "benchmark_official"
 
     def test_official_score_pass_threshold(self) -> None:
-        ur = UtilityEvaluator().evaluate(self._result([True]), _outcomes([True]), official_task_score=0.83)
-        assert ur.task_success is True
-        assert ur.details[-1]["score"] == pytest.approx(0.83)
+        bundle = UtilityEvaluator().calculate(
+            MetricInput(
+                execution=TaskExecution(
+                    task_id="t", task_name="t", memory_backend="m", sessions=_outcomes([True])
+                ),
+                extra={"official_task_score": 0.83},
+            )
+        )
+        assert bundle.values["task_success"] == 1.0
+        assert bundle.details[-1]["score"] == pytest.approx(0.83)
 
     def test_no_official_falls_back_to_completion(self) -> None:
         """无官方口径（自定义任务）保持完成率语义。"""
-        ur = UtilityEvaluator().evaluate(self._result([True, False]), _outcomes([True, False]))
-        assert ur.task_success is False
-        assert ur.success_rate == 0.5
-        assert not any(d.get("source") == "benchmark_official" for d in ur.details)
+        bundle = UtilityEvaluator().calculate(
+            MetricInput(
+                execution=TaskExecution(
+                    task_id="t",
+                    task_name="t",
+                    memory_backend="m",
+                    sessions=_outcomes([True, False]),
+                )
+            )
+        )
+        assert bundle.values["task_success"] == 0.0
+        assert bundle.values["success_rate"] == 0.5
+        assert not any(d.get("source") == "benchmark_official" for d in bundle.details)
 
     def test_metricinput_extra_channel(self) -> None:
         """pipeline 经 MetricInput.extra 传入官方分（不增加计算器间耦合）。"""
-        from dumemeval.metrics import MetricInput
-
-        result = self._result([True])
-        UtilityEvaluator().calculate(
-            MetricInput(result=result, outcomes=[], extra={"official_task_score": 0.0})
+        bundle = UtilityEvaluator().calculate(
+            MetricInput(
+                execution=TaskExecution(task_id="t", task_name="t", memory_backend="m", sessions=[]),
+                extra={"official_task_score": 0.0},
+            )
         )
-        assert result.utility.task_success is False
+        assert bundle.values["task_success"] == 0.0
 
 
 # ── Gap 3：任务环境层 ───────────────────────────────────────────────────────

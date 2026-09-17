@@ -12,7 +12,7 @@ import dumemeval.datasets.benchmarks  # noqa: F401
 from dumemeval.datasets import get_benchmark
 from dumemeval.datasets.benchmarks.locomo_plus import LocomoPlusAdapter, LocomoPlusData
 from dumemeval.metrics.benchmarks.locomo_plus import build_judge_prompt, label_to_score, parse_judge_label
-from dumemeval.models import AgentOutput, EvalResult
+from dumemeval.models import AgentOutput
 from dumemeval.verifier.base import Verdict
 
 RAW: list[dict[str, object]] = [
@@ -74,7 +74,7 @@ class TestLocomoPlusAdapter:
         a = LocomoPlusAdapter(judge=lambda pred, gold, q: True)
         task = a.build_tasks(LocomoPlusData.from_raw(RAW))[0]
         outputs = [AgentOutput(query=str(RAW[0]["trigger_query"]), output="I should have said no.")]
-        metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+        metrics = a.evaluate(task, outputs)
         assert metrics["score"] == 1.0
         assert metrics["score_causal"] == 1.0
 
@@ -84,14 +84,14 @@ class TestLocomoPlusAdapter:
         outputs = [AgentOutput(query=str(RAW[0]["trigger_query"]), output="I should have said no.")]
         with patch("dumemeval.verifier.LLMJudgeVerifier.verify_with_prompt") as mock_verify:
             mock_verify.return_value = Verdict(label="", score=0.0, raw='{"label": "correct"}')
-            metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+            metrics = a.evaluate(task, outputs)
         assert metrics["score"] == 1.0
 
     def test_evaluate_partial_score(self) -> None:
         a = LocomoPlusAdapter(judge=lambda pred, gold, q: False)
         task = a.build_tasks(LocomoPlusData.from_raw(RAW))[0]
         outputs = [AgentOutput(query=str(RAW[0]["trigger_query"]), output="irrelevant")]
-        metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+        metrics = a.evaluate(task, outputs)
         assert metrics["score"] == 0.0
 
     def test_load_real_data(self) -> None:
@@ -110,7 +110,7 @@ class TestInjectedJudgePartial:
         """注入 judge 返回 float（0~1）→ partial=0.5 档（旧实现 bool 丢 partial）。"""
         from dumemeval.metrics import MetricInput
         from dumemeval.metrics.benchmarks.locomo_plus import LocomoPlusCalculator
-        from dumemeval.models import EvalResult, EvalTask
+        from dumemeval.models import EvalTask
 
         task = EvalTask(
             name="lp",
@@ -133,6 +133,6 @@ class TestInjectedJudgePartial:
                 return _score
 
             bundle = LocomoPlusCalculator(judge=constant_judge).calculate(
-                MetricInput(result=EvalResult(task_name="t", memory_backend="m"), task=task, outputs=outputs)
+                MetricInput(task=task, outputs=outputs)
             )
             assert bundle.values["score"] == pytest.approx(expected), f"judge={raw!r}"

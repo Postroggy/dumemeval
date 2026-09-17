@@ -35,7 +35,10 @@ class UtilityEvaluator(MetricCalculator):
             cost_usd=sum(getattr(o, "cost_usd", 0.0) for o in outcomes),
         )
         if official_score is not None:
-            ur.details.append({"source": "benchmark_official", "score": official_score})
+            ur.details.append({"source": "benchmark_official", "score": official_score, "threshold": 0.5})
+        baseline = inp.extra.get("baseline_success_rate")
+        if baseline is not None:
+            ur.memory_conditioned_gain = ur.success_rate - float(baseline)
         return MetricBundle(
             name=self.name,
             kind=self.kind,

@@ -66,7 +66,7 @@ class ParallelTaskRunner:
     async def run(self, tasks: list[EvalTask]) -> list[TaskExecution]:
         """并行执行所有 task，返回结果列表（与 tasks 顺序对齐）。
 
-        单个 task 失败不中断其余 task：转成带 error 的 session_outcomes
+        单个 task 失败不中断其余 task：转成带 error 的 TaskExecution
         （错误显式进入结果与日志，最终报告可见，不静默吞掉）。
         """
         semaphore = asyncio.Semaphore(self.n_concurrent)
@@ -78,7 +78,7 @@ class ParallelTaskRunner:
                     results[task.name] = await self._run_task(task)
                 except Exception as e:
                     # 兼容性回退（单 task 失败不影响整批评测），非吞异常：
-                    # 错误写入 session_outcomes 并记日志
+                    # 错误写入 TaskExecution.sessions 并记日志
                     logger.exception("task %s 编排失败", task.name)
                     failed = TaskExecution(task_id=task.name, task_name=task.name, memory_backend="(failed)")
                     # session_id 从 1 起（SessionOutcome 约束 >= 1）；0 为非法

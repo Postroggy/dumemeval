@@ -5,11 +5,13 @@ Execution is deliberately an input: this module never runs sessions or mutates i
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from typing import Any
 
 from ..metrics.core.base import MetricCalculator, MetricInput, MetricsAggregator
 from ..models import (
     EvalTask,
+    MemoryFact,
     SampleResult,
     TaskExecution,
     TaskResult,
@@ -22,11 +24,21 @@ Verifier = Callable[[SampleResult], Verdict]
 
 class Evaluator:
     def __init__(
-        self, verifier: Verifier | None, scorer: BenchmarkScorer | None, metrics: list[MetricCalculator] = ()
-    ):
+        self,
+        verifier: Verifier | None,
+        scorer: BenchmarkScorer | None,
+        metrics: Sequence[MetricCalculator] = (),
+    ) -> None:
         self.verifier, self.scorer, self.metrics = verifier, scorer, list(metrics)
 
-    def evaluate(self, task: EvalTask, execution: TaskExecution) -> TaskResult:
+    def evaluate(
+        self,
+        task: EvalTask,
+        execution: TaskExecution,
+        *,
+        memory_files: dict[str, str] | None = None,
+        ground_truth_facts: list[MemoryFact] | None = None,
+    ) -> TaskResult:
         samples = []
         for outcome in execution.sessions:
             if not outcome.observation:
@@ -56,8 +68,19 @@ class Evaluator:
         )
         report = None
         if self.metrics:
+            extra: dict[str, Any] = {}
+            if benchmark is not None and benchmark.primary_score is not None:
+                extra["official_task_score"] = benchmark.primary_score
             report = MetricsAggregator(self.metrics).run(
-                MetricInput(task=task, execution=execution, samples=samples, benchmark=benchmark)
+                MetricInput(
+                    task=task,
+                    execution=execution,
+                    samples=samples,
+                    benchmark=benchmark,
+                    memory_files=memory_files or {},
+                    ground_truth_facts=ground_truth_facts or [],
+                    extra=extra,
+                )
             )
         return TaskResult(
             task_id=execution.task_id,

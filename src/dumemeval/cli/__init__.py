@@ -60,12 +60,14 @@ def build_parser() -> argparse.ArgumentParser:
         default="all",
     )
 
+    from ..datasets.prepare import prepare_cli_names
+
     prepare_parser = sub.add_parser("prepare", help="一键下载官方评测数据到本地缓存并切 smoke 子集")
     prepare_parser.add_argument(
         "--dataset",
-        choices=None,
+        choices=("all", *prepare_cli_names()),
         default="all",
-        help="要准备的数据集（默认 all）",
+        help="要准备的数据集（默认 all = 注册表里所有可下载项）",
     )
     prepare_parser.add_argument("--force", action="store_true", help="强制重新下载（否则缓存命中即跳过）")
     prepare_parser.add_argument(

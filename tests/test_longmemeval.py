@@ -12,7 +12,7 @@ import dumemeval.datasets.benchmarks  # noqa: F401
 from dumemeval.datasets import get_benchmark
 from dumemeval.datasets.benchmarks.longmemeval import LongMemEvalAdapter, LongMemEvalData
 from dumemeval.metrics.benchmarks.longmemeval import build_anscheck_prompt, judge_yes
-from dumemeval.models import AgentOutput, EvalResult
+from dumemeval.models import AgentOutput
 from dumemeval.verifier.base import Verdict
 
 RAW = [
@@ -80,7 +80,7 @@ class TestLongMemEvalAdapter:
         task = a.build_tasks(LongMemEvalData.from_raw(RAW))[0]
         qas = task.data["questions"]
         outputs = [AgentOutput(query=qas[0]["question"], output="boots")]
-        metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+        metrics = a.evaluate(task, outputs)
         assert metrics["accuracy"] == 1.0
         assert "abstention_accuracy" not in metrics.values  # 无 abstention 题
 
@@ -89,7 +89,7 @@ class TestLongMemEvalAdapter:
         task = a.build_tasks(LongMemEvalData.from_raw(RAW))[1]
         qas = task.data["questions"]
         outputs = [AgentOutput(query=qas[0]["question"], output="I don't have enough information")]
-        metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+        metrics = a.evaluate(task, outputs)
         assert metrics["abstention_accuracy"] == 1.0
         assert "accuracy" not in metrics.values  # 纯 abstention 题不计 overall
 
@@ -100,7 +100,7 @@ class TestLongMemEvalAdapter:
         outputs = [AgentOutput(query=qas[0]["question"], output="boots")]
         with patch("dumemeval.verifier.LLMJudgeVerifier.verify_with_prompt") as mock_verify:
             mock_verify.return_value = Verdict(label="", score=0.0, raw="yes")
-            metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+            metrics = a.evaluate(task, outputs)
         assert metrics["accuracy"] == 1.0
 
     def test_load_real_data(self) -> None:

@@ -18,13 +18,14 @@ from ..adapters.base import BaseMemoryAdapter
 from ..artifacts.provenance import derive_run_id
 from ..artifacts.report import ReportGenerator
 from ..core.config import ExperimentConfig
-from ..evaluation import CalculatorBenchmarkScorer
+from ..evaluation import CalculatorBenchmarkScorer, Verifier
 from ..models import (
     BenchmarkResult,
     EvalTask,
     MemoryFact,
     RunProvenance,
     RunSummary,
+    SampleResult,
     TaskExecution,
     TaskResult,
     TaskSummary,
@@ -92,19 +93,23 @@ def finalize_run(
         calculators = [UtilityCalculator(), EfficiencyCalculator(), TraceCalculator()]
         if ground_truth:
             calculators.insert(0, QualityCalculator(judge_cfg))
-        verifier = None
-        if mock and rule_judge:
+        verifier: Verifier | None = None
+        if mock and rule_judge is not None:
             answers = task.data.get("answers", []) if isinstance(task.data, dict) else []
 
-            def verifier(sample, answers=answers):
+            def _verify(sample: SampleResult, answers: list[Any] = answers) -> Verdict:
                 gold = sample.ground_truth or (str(answers[0]) if answers else "")
-                return Verdict(
-                    label="correct" if rule_judge(sample.response, gold, sample.query) else "incorrect",
-                    score=1.0 if rule_judge(sample.response, gold, sample.query) else 0.0,
-                )
+                passed = bool(rule_judge(sample.response, gold, sample.query))
+                return Verdict(label="correct" if passed else "incorrect", score=1.0 if passed else 0.0)
+
+            verifier = _verify
 
         evaluator = Evaluator(verifier, scorer, calculators)
-        task_result = evaluator.evaluate(task, result)
+        adapter = adapters.get(task.name)
+        memory_files = _memory_files(adapter)
+        task_result = evaluator.evaluate(
+            task, result, memory_files=memory_files, ground_truth_facts=ground_truth
+        )
         task_results.append(task_result)
         benchmark_result = task_result.benchmark
         bench_main = benchmark_result.primary_score if benchmark_result else None
@@ -117,8 +122,8 @@ def finalize_run(
                 n_sessions=len(result.sessions),
                 n_success=sum(1 for rec in result.sessions if rec.success),
                 report_dir=str(
-                    ReportGenerator(output_dir).generate_task(
-                        task_result, cfg.model_dump(), provenance=provenance, formats=cfg.output.format
+                    ReportGenerator(output_dir).generate(
+                        task_result, config=cfg, provenance=provenance, formats=cfg.output.format
                     )
                 ),
                 benchmark_f1=bench_main,
@@ -145,6 +150,13 @@ def finalize_run(
     return summary
 
 
+def _memory_files(adapter: BaseMemoryAdapter | None) -> dict[str, str]:
+    if adapter is None:
+        return {}
+    files = adapter.read_memory_files()
+    return files if isinstance(files, dict) else {}
+
+
 def _benchmark_options(task: EvalTask) -> dict[str, str]:
     data = task.data if isinstance(task.data, dict) else {}
     mode = str(data.get("judgement_mode") or "hint")
@@ -168,10 +180,9 @@ def _apply_averages(summary: RunSummary, results: list[TaskResult]) -> None:
     n = len(results)
     if not n:
         return
-    judged = [r for r in results if r.metrics and r.metrics.quality]
-    if judged:
-        summary.quality_recall_avg = sum(r.metrics.quality.recall for r in judged) / len(judged)
-        summary.quality_precision_avg = sum(r.metrics.quality.precision for r in judged) / len(judged)
-    summary.utility_success_rate_avg = (
-        sum(r.metrics.utility.success_rate for r in results if r.metrics and r.metrics.utility) / n
-    )
+    quality = [r.metrics.quality for r in results if r.metrics is not None and r.metrics.quality is not None]
+    if quality:
+        summary.quality_recall_avg = sum(item.recall for item in quality) / len(quality)
+        summary.quality_precision_avg = sum(item.precision for item in quality) / len(quality)
+    utility = [r.metrics.utility for r in results if r.metrics is not None and r.metrics.utility is not None]
+    summary.utility_success_rate_avg = sum(item.success_rate for item in utility) / n if utility else 0.0

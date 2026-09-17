@@ -1,6 +1,6 @@
 """统一指标计算层。
 
-一次评测 → MetricsAggregator → EvalResult.metrics（扁平）+ 类型化 quality/utility/efficiency/benchmark。
+一次评测 → MetricsAggregator → MetricReport（扁平 + 类型化 quality/utility/efficiency/trace）。
 Benchmark 计算器走注册表：加数据集不必改 get_benchmark_calculator 的分支。
 
 分层：
@@ -45,12 +45,12 @@ from .core import (
     MetricInput,
     MetricsAggregator,
     calculator_names,
+    declared_metric_names,
     get_benchmark_calculator,
-    outputs_from_result,
+    outputs_from_execution,
     prediction_for_item,
     register_calculator,
     round_items,
-    session_records_to_outcomes,
 )
 from .dimensions import (
     EfficiencyCalculator,
@@ -121,14 +121,14 @@ __all__ = [
     "UtilityCalculator",
     "UtilityEvaluator",
     "calculator_names",
+    "declared_metric_names",
     "get_benchmark_calculator",
     "judge_round",
     "locomo_f1",
     "locomo_f1_multi",
-    "outputs_from_result",
+    "outputs_from_execution",
     "prediction_for_item",
     "register_calculator",
     "round_items",
     "score_locomo_f1",
-    "session_records_to_outcomes",
 ]

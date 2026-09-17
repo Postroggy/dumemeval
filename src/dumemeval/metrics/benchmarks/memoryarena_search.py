@@ -28,6 +28,7 @@ class MemoryArenaSearchCalculator(MetricCalculator):
 
     name: ClassVar[str] = "memoryarena_search"
     kind: ClassVar[MetricKind] = "benchmark"
+    metrics: ClassVar[tuple[str, ...]] = ("is_correct",)
 
     def __init__(self, judge: JudgeFn | None = None, llm_config: dict[str, Any] | None = None):
         self._judge = judge

@@ -42,7 +42,7 @@
 ### 完整数据（`dumemeval prepare`）
 
 ```bash
-dumemeval prepare                  # locomo + shopping（缓存命中即跳过）
+dumemeval prepare                  # 注册表里所有可下载数据集（缓存命中即跳过）
 dumemeval prepare --dataset locomo # 只要 locomo
 dumemeval prepare --force          # 强制重新下载
 ```
@@ -69,7 +69,7 @@ dumemeval prepare --force          # 强制重新下载
 
 ## 验证
 
-- `tests/test_prepare.py`：切片逻辑（离线）、捆绑文件与切片口径一致、CLI 接线（monkeypatch 下载）。
+- `tests/test_prepare.py`：切片逻辑（离线）、捆绑文件与切片口径一致、CLI 接线（monkeypatch `prepare_dataset`）。
 - `tests/test_memory_instruction.py`：smoke 配置用捆绑数据 load + build，不再依赖本机 `Dataset/`。
 - CI 新增一步：`configs/smoke/locomo_transfer.yaml --mock`（零下载、零 Docker 验证捆绑数据可跑）。
 - `dumemeval prepare` 按 DatasetSpec registry 准备已注册数据；不再依赖 doctor 命令。

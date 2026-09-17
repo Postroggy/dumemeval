@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from ..metrics.core.base import MetricBundle, MetricInput
-from ..metrics.core.registry import get_benchmark_calculator
+from ..metrics.core.registry import declared_metric_names, get_benchmark_calculator
 from ..models import BenchmarkResult
 
 
@@ -41,3 +41,6 @@ def _primary_metric(bundle: MetricBundle) -> str | None:
         if name in bundle.values:
             return name
     return next(iter(bundle.values), None)
+
+
+__all__ = ["BenchmarkScorer", "CalculatorBenchmarkScorer", "declared_metric_names"]

@@ -14,7 +14,15 @@ from dumemeval.metrics.dimensions.trace_stats import (
     ToolCallCounter,
     TraceEnricher,
 )
-from dumemeval.models import EvalResult, EvalTask, SessionSpec, TraceResult
+from dumemeval.models import (
+    EvalTask,
+    MetricReport,
+    SessionOutcome,
+    SessionSpec,
+    TaskExecution,
+    TaskResult,
+    TraceResult,
+)
 
 
 def _make_step(
@@ -98,8 +106,9 @@ class TestStatCalculators:
 
 
 class TestTraceEnricher:
-    def _task_with_trial(self, tmp: Path, traj: dict[str, Any] | None) -> tuple[EvalTask, EvalResult]:
+    def _task_with_trial(self, tmp: Path, traj: dict[str, Any] | None) -> tuple[EvalTask, TaskResult]:
         trial = tmp / "trials" / "session_1"
+        trial_dir = str(trial)
         if traj is not None:
             (trial / "agent").mkdir(parents=True)
             import json
@@ -109,20 +118,19 @@ class TestTraceEnricher:
             name="t",
             sessions=[SessionSpec(id=1, instruction="s1")],
         )
-        result = EvalResult(task_name="t", memory_backend="m")
-        result.session_outcomes = [
-            {
-                "session_id": 1,
-                "success": True,
-                "observation": "obs",
-                "error": None,
-                "tokens_in": 0,
-                "tokens_out": 0,
-                "trial_dir": str(trial),
-                "query": None,
-            }
-        ]
-        result.trace = TraceResult()
+        result = TaskResult(
+            task_id="t",
+            task_name="t",
+            execution=TaskExecution(
+                task_id="t",
+                task_name="t",
+                memory_backend="m",
+                sessions=[
+                    SessionOutcome(session_id=1, success=True, observation="obs", trial_dir=trial_dir),
+                ],
+            ),
+            metrics=MetricReport(trace=TraceResult()),
+        )
         return task, result
 
     def test_enrich_writes_stats(self, tmp_path: Path) -> None:
@@ -134,8 +142,8 @@ class TestTraceEnricher:
         )
         task, result = self._task_with_trial(tmp_path, traj)
         TraceEnricher().enrich(task, result)
-        assert result.trace is not None
-        entry = result.trace.details[0]
+        assert result.metrics is not None and result.metrics.trace is not None
+        entry = result.metrics.trace.details[0]
         assert entry["stats_available"] is True
         assert entry["tool_calls"]["total"] == 1
         assert entry["llm_calls"]["total"] == 1
@@ -145,26 +153,26 @@ class TestTraceEnricher:
     def test_enrich_no_trajectory_marks_unavailable(self, tmp_path: Path) -> None:
         task, result = self._task_with_trial(tmp_path, None)
         TraceEnricher().enrich(task, result)
-        assert result.trace is not None
-        entry = result.trace.details[0]
+        assert result.metrics is not None and result.metrics.trace is not None
+        entry = result.metrics.trace.details[0]
         assert entry["stats_available"] is False
         assert "tool_calls" not in entry
 
     def test_enrich_no_trial_dir_marks_unavailable(self) -> None:
         task = EvalTask(name="t", sessions=[SessionSpec(id=1, instruction="s1")])
-        result = EvalResult(task_name="t", memory_backend="m")
-        result.session_outcomes = [
-            {
-                "session_id": 1,
-                "success": True,
-                "observation": "obs",
-                "error": None,
-                "tokens_in": 0,
-                "tokens_out": 0,
-                "trial_dir": None,
-                "query": None,
-            }
-        ]
-        result.trace = TraceResult()
+        result = TaskResult(
+            task_id="t",
+            task_name="t",
+            execution=TaskExecution(
+                task_id="t",
+                task_name="t",
+                memory_backend="m",
+                sessions=[
+                    SessionOutcome(session_id=1, success=True, observation="obs", trial_dir=None),
+                ],
+            ),
+            metrics=MetricReport(trace=TraceResult()),
+        )
         TraceEnricher().enrich(task, result)
-        assert result.trace.details[0]["stats_available"] is False
+        assert result.metrics is not None and result.metrics.trace is not None
+        assert result.metrics.trace.details[0]["stats_available"] is False

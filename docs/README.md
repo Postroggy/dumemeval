@@ -10,7 +10,7 @@
 
 | 目录 | 对应源码 | 放什么 |
 |---|---|---|
-| `architecture/` | 跨模块 | 分层与依赖禁区、评测循环、扩展点契约、**开发规范**（dev-standards.md） |
+| `architecture/` | 跨模块 | 分层与依赖禁区、评测循环、扩展点契约、**开发规范**（dev-standards.md）、**CI 口径**（ci.md） |
 | `adapters/` | `src/dumemeval/adapters/` | 每个 memory 后端一篇：生命周期怎么映射到该产品 |
 | `datasets/` | `src/dumemeval/datasets/` | 每个数据集一篇：来源 URL、如何变成 EvalTask |
 | `metrics/` | `src/dumemeval/metrics/` | 每个指标族一篇：口径、官方实现出处、语义边界 |

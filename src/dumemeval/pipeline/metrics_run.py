@@ -85,7 +85,7 @@ def run_metrics(summary: RunSummary, results: list[TaskResult]) -> dict[str, flo
         metrics["efficiency.tokens_out"] = sum(r.tokens_out for r in efficiency) / len(efficiency)
         metrics["efficiency.cost_usd"] = sum(r.cost_usd for r in efficiency) / len(efficiency)
 
-    traced = [r.metrics.trace for r in results if r.metrics.trace is not None]
+    traced = [r.metrics.trace for r in results if r.metrics is not None and r.metrics.trace is not None]
     if traced:
         count = len(traced)
         metrics["trace.trace_captured_rate"] = sum(t.trace_captured_rate for t in traced) / count

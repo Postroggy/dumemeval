@@ -11,7 +11,7 @@ import dumemeval.datasets.benchmarks  # noqa: F401
 from dumemeval.datasets import get_benchmark
 from dumemeval.datasets.benchmarks.memorybench import MemoryBenchData
 from dumemeval.metrics.benchmarks.memorybench import exact_match, rouge_l_f1, token_f1
-from dumemeval.models import AgentOutput, EvalResult
+from dumemeval.models import AgentOutput
 
 
 def _sample(dataset: str, question: str, golden: str, category: int = 0) -> dict[str, object]:
@@ -63,7 +63,7 @@ class TestMemoryBenchAdapter:
             AgentOutput(query=qas[0]["question"], output="Brave by Sara Bareilles"),
             AgentOutput(query=qas[1]["question"], output="no information available"),
         ]
-        metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+        metrics = a.evaluate(task, outputs)
         # Q1 F1=1, Q2 cat5 拒答=1 → 全对
         assert metrics["score"] == 1.0
         assert metrics["score_Locomo-0"] == 1.0
@@ -77,7 +77,7 @@ class TestMemoryBenchAdapter:
         qas = task.data["samples"]
         # 输出与 golden 不 exact，走 LLM judge fallback
         outputs = [AgentOutput(query=qas[0]["question"], output="different wording")]
-        metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+        metrics = a.evaluate(task, outputs)
         assert metrics["score"] == 1.0
 
     def test_evaluate_lexeval_rouge(self) -> None:
@@ -86,7 +86,7 @@ class TestMemoryBenchAdapter:
         task = a.build_tasks(MemoryBenchData.from_raw(raw))[0]
         qas = task.data["samples"]
         outputs = [AgentOutput(query=qas[0]["question"], output="the judge ruled in favor")]
-        metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+        metrics = a.evaluate(task, outputs)
         assert metrics["score"] == 1.0
 
     def test_load_real_subset(self) -> None:

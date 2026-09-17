@@ -191,12 +191,13 @@ def _locomo_task(name: str, answer_pred: str) -> EvalTask:
 
 
 def _result_for(task: EvalTask, observation: str) -> Any:
-    from dumemeval.models import EvalResult
+    from dumemeval.models import SessionOutcome, TaskExecution
 
-    return EvalResult(
+    return TaskExecution(
+        task_id=task.name,
         task_name=task.name,
         memory_backend="stub",
-        session_outcomes=[{"session_id": 1, "success": True, "observation": observation, "query": None}],
+        sessions=[SessionOutcome(session_id=1, success=True, observation=observation)],
     )
 
 

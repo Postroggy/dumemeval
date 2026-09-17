@@ -4,8 +4,15 @@ Concrete definitions live in focused modules; this file is the stable import sur
 """
 
 from .evaluation import AgentOutput, BenchmarkMetrics
-from .execution import MemoryFact, MemoryMount, MemoryOp, SessionOutcome
-from .legacy import EvalResult
+from .execution import (
+    MEMORY_READ_OPS,
+    MEMORY_WRITE_OPS,
+    MemoryFact,
+    MemoryMount,
+    MemoryOp,
+    MemoryOpName,
+    SessionOutcome,
+)
 from .metrics import EfficiencyResult, QualityResult, TraceResult, UtilityResult
 from .results import BenchmarkResult, MetricReport, SampleResult, TaskExecution, TaskResult, Verdict
 from .run import (
@@ -22,16 +29,18 @@ from .run import (
 from .tasks import EvalTask, MemorySpec, SessionSpec, VerifierSpec
 
 __all__ = [
+    "MEMORY_READ_OPS",
+    "MEMORY_WRITE_OPS",
     "AgentOutput",
     "BenchmarkMetrics",
     "BenchmarkResult",
     "EfficiencyResult",
-    "EvalResult",
     "EvalTask",
     "GitSnapshot",
     "MemoryFact",
     "MemoryMount",
     "MemoryOp",
+    "MemoryOpName",
     "MemorySpec",
     "MetricDelta",
     "MetricDirection",

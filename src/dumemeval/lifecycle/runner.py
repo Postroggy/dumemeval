@@ -78,6 +78,7 @@ class SessionRunner:
             except Exception as e:
                 outcome = SessionOutcome(session_id=session.id, success=False, error=str(e))
                 await self.hooks.emit(LifecycleEvent.ERROR, session, session_ctx)
+            outcome.query = session.query
             session_outcomes.append(outcome)
 
             if self.protocol.should_snapshot(session.memory_inject):

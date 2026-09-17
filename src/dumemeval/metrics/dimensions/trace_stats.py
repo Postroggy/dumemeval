@@ -20,7 +20,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ...models import EvalResult, EvalTask
+from ...models import EvalTask, TaskResult, TraceResult
 
 logger = logging.getLogger(__name__)
 
@@ -150,12 +150,13 @@ class TraceEnricher:
     def __init__(self, calculators: list[TraceStatCalculator] | None = None):
         self.calculators = calculators or [cls() for cls in _BUILTIN_STATS]
 
-    def enrich(self, task: EvalTask, result: EvalResult) -> None:
-        details = [d for d in result.trace.details if "stats" not in d] if result.trace else []
-        for rec in result.session_outcomes:
-            trial_dir = rec.get("trial_dir")
+    def enrich(self, task: EvalTask, result: TaskResult) -> None:
+        trace = result.metrics.trace if result.metrics is not None else None
+        details = [d for d in trace.details if "stats" not in d] if trace else []
+        for rec in result.execution.sessions:
+            trial_dir = rec.trial_dir
             trajectory = self._load_trajectory(trial_dir) if trial_dir else None
-            entry: dict[str, Any] = {"session_id": rec.get("session_id")}
+            entry: dict[str, Any] = {"session_id": rec.session_id}
             if trajectory is None:
                 entry["stats_available"] = False
             else:
@@ -164,8 +165,10 @@ class TraceEnricher:
                     entry[calc.name] = calc.calculate(trajectory)
             details.append(entry)
 
-        if result.trace is not None:
-            result.trace.details = details
+        if trace is not None:
+            trace.details = details
+        elif result.metrics is not None:
+            result.metrics.trace = TraceResult(details=details)
 
     @staticmethod
     def _load_trajectory(trial_dir: str) -> dict[str, Any] | None:

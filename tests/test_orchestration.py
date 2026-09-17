@@ -49,9 +49,16 @@ class TestSessionRunner:
         result = await runner.run(task)
 
         assert result.task_name == "test-task"
-        assert result.utility.task_success is True
-        assert result.utility.turns == 2
-        assert result.utility.success_rate == 1.0
+        assert len(result.sessions) == 2
+        assert all(session.success for session in result.sessions)
+        assert all(session.observation for session in result.sessions)
+        from dumemeval.metrics.core.base import MetricInput
+        from dumemeval.metrics.dimensions.utility import UtilityEvaluator
+
+        bundle = UtilityEvaluator().calculate(MetricInput(execution=result))
+        assert bundle.values["task_success"] == 1.0
+        assert bundle.values["turns"] == 2.0
+        assert bundle.values["success_rate"] == 1.0
         # memory ops 应包含 setup + inject + snapshot
         ops = result.memory_ops
         assert any(op.op == "setup" for op in ops)
@@ -207,4 +214,9 @@ class TestProtocolIntegration:
         result = await runner.run(task)
 
         assert errors == ["error"] * 2  # 两个 session 各触发一次
-        assert result.utility.task_success is False
+        assert not any(session.success for session in result.sessions)
+        from dumemeval.metrics.core.base import MetricInput
+        from dumemeval.metrics.dimensions.utility import UtilityEvaluator
+
+        bundle = UtilityEvaluator().calculate(MetricInput(execution=result))
+        assert bundle.values["task_success"] == 0.0

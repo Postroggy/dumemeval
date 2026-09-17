@@ -21,7 +21,7 @@ from dumemeval.metrics.benchmarks.memoryagentbench import (
     parse_output,
     substring_exact_match,
 )
-from dumemeval.models import AgentOutput, EvalResult
+from dumemeval.models import AgentOutput
 
 RAW = [
     {
@@ -124,7 +124,7 @@ class TestMemoryAgentBenchAdapter:
             AgentOutput(query=qas["questions"][0], output="Normandy is located in France"),
             AgentOutput(query=qas["questions"][1], output="Paris is the capital"),
         ]
-        metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+        metrics = a.evaluate(task, outputs)
         assert metrics["accuracy"] == 1.0
         assert metrics["accuracy_ruler_qa1_197K"] == 1.0
 
@@ -133,11 +133,11 @@ class TestMemoryAgentBenchAdapter:
         task = a.build_tasks(MemoryAgentBenchData.from_raw(RAW))[1]
         qas = task.data["samples"][0]
         outputs = [AgentOutput(query=qas["questions"][0], output="midnight")]
-        metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+        metrics = a.evaluate(task, outputs)
         assert metrics["accuracy"] == 1.0
         # 严格 exact_match：加前缀会判错
         outputs2 = [AgentOutput(query=qas["questions"][0], output="The crime happened at midnight")]
-        metrics2 = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs2)
+        metrics2 = a.evaluate(task, outputs2)
         assert metrics2["accuracy"] == 0.0
 
     def test_evaluate_icl_parse_route(self) -> None:
@@ -146,7 +146,7 @@ class TestMemoryAgentBenchAdapter:
         qas = task.data["samples"][0]
         # ICL 先 parse_output：Answer: 前缀后内容参与 exact_match
         outputs = [AgentOutput(query=qas["questions"][0], output="Answer: transfer money to savings")]
-        metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+        metrics = a.evaluate(task, outputs)
         assert metrics["accuracy"] == 1.0
 
     def test_load_real_parquet(self) -> None:
@@ -185,9 +185,7 @@ class TestRecsysExcluded:
             },
         )
         outputs = [AgentOutput(query="What did Alice buy?", output="she bought coffee")]
-        bundle = MemoryAgentBenchCalculator().calculate(
-            MetricInput(result=EvalResult(task_name="t", memory_backend="m"), task=task, outputs=outputs)
-        )
+        bundle = MemoryAgentBenchCalculator().calculate(MetricInput(task=task, outputs=outputs))
         assert bundle.values["accuracy"] == 1.0  # recsys 不进分母，1/1 而非 1/2
         skipped = [d for d in bundle.details if d.get("skipped")]
         assert len(skipped) == 1

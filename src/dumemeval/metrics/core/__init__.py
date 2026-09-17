@@ -10,13 +10,12 @@ from .base import (
     MetricCalculator,
     MetricInput,
     MetricsAggregator,
-    outputs_from_result,
+    outputs_from_execution,
     prediction_for_item,
     round_items,
-    session_records_to_outcomes,
 )
 from .probe import QualityProbe
-from .registry import calculator_names, get_benchmark_calculator, register_calculator
+from .registry import calculator_names, declared_metric_names, get_benchmark_calculator, register_calculator
 
 __all__ = [
     "AggregatedMetrics",
@@ -26,10 +25,10 @@ __all__ = [
     "MetricsAggregator",
     "QualityProbe",
     "calculator_names",
+    "declared_metric_names",
     "get_benchmark_calculator",
-    "outputs_from_result",
+    "outputs_from_execution",
     "prediction_for_item",
     "register_calculator",
     "round_items",
-    "session_records_to_outcomes",
 ]

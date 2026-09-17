@@ -12,7 +12,7 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel
 
-from ..models import EvalTask
+from ..models import AgentOutput, BenchmarkMetrics, EvalTask
 
 
 class BenchmarkData(BaseModel, ABC):
@@ -55,6 +55,41 @@ class BenchmarkAdapter(ABC):
         基类不设 ``**options``（避免调用方绕过子类签名约束）。
         """
         raise NotImplementedError
+
+    def metrics(self) -> list[str]:
+        """Official metric names declared by the matching calculator."""
+        from ..evaluation import declared_metric_names
+
+        return declared_metric_names(self.name)
+
+    def evaluate(
+        self,
+        task: EvalTask,
+        outputs: list[AgentOutput],
+    ) -> BenchmarkMetrics:
+        """Direct scoring API backed by evaluation.BenchmarkScorer."""
+        from ..evaluation import CalculatorBenchmarkScorer
+        from ..metrics.core.base import MetricInput
+
+        options: dict[str, Any] = {}
+        judge = getattr(self, "_judge", None)
+        if judge is not None:
+            options["judge"] = judge
+        judgement_mode = getattr(self, "judgement_mode", None)
+        if judgement_mode is not None:
+            options["judgement_mode"] = judgement_mode
+        lang = getattr(self, "lang", None)
+        if lang is not None:
+            options["lang"] = lang
+        scored = CalculatorBenchmarkScorer(self.name, **options).score(
+            MetricInput(task=task, outputs=outputs)
+        )
+        return BenchmarkMetrics(
+            name=scored.benchmark,
+            values=scored.values,
+            by_category=scored.by_category,
+            details=scored.details,
+        )
 
 
 # ── 注册表 ──────────────────────────────────────────────────────────────────

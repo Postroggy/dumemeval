@@ -29,8 +29,7 @@ Fixes / Closes #<issue 号>（没有对应 Issue 的先开一个再提 PR；纯�
 - [ ] 未改禁区文件：`lifecycle/runner.py`（`SessionRunner` / `ParallelTaskRunner` 主循环）、`metrics` 的分支计算逻辑等（必须改时，先在本 PR 说明理由并 @维护者）
 - [ ] 新公共类型是 pydantic `BaseModel`
 - [ ] 数据集 PR：适配器 docstring 有 `Source:` URL，`docs/datasets/README.md` 表格已更新
-- [ ] `make test` 绿（`pytest -m "not e2e"`）
-- [ ] `make lint` 绿（ruff + mypy）
+- [ ] `make ci` 绿（与 GitHub Actions 同口径：ruff + mypy + pytest + build + mock smoke）
 - [ ] 若改了指标语义：在 `GOVERNANCE.md`「勿过度解读」补一句
 
 ## 语义边界（如引入新指标 / 改判分）

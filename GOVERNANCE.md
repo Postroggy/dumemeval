@@ -19,7 +19,7 @@ ExperimentConfig（校验）
         → adapter.setup / seed_history / inject / snapshot / observe
         → executor.run_session（Harbor 或 Mock）
         → MemoryTransfer.collect → 下一 session inject
-    → MetricsAggregator（Quality + Utility + Efficiency + 官方口径）
+    → Evaluator（TaskExecution → samples / BenchmarkScorer / MetricsAggregator）
     → ReportGenerator
 ```
 
@@ -35,16 +35,18 @@ flowchart TD
     AD -.-> EX
     EX --> MT["MemoryTransfer collect → 下一 session"]
     MT --> SR
-    SR --> AGG["MetricsAggregator"]
-    AGG --> REP["provenance + report"]
+    SR --> EVAL["Evaluator + BenchmarkScorer"]
+    EVAL --> AGG["MetricsAggregator"]
+    AGG --> REP["artifacts report + provenance"]
 ```
 
 ## 分层（单向依赖）
 
 ```mermaid
 flowchart BT
-    CLI["cli"] --> PIPE["pipeline / report"]
+    CLI["cli"] --> PIPE["pipeline / artifacts"]
     PIPE --> LIFE["lifecycle"]
+    PIPE --> EVAL["evaluation"]
     LIFE --> ADP["adapters"]
     LIFE --> EXE["execution"]
     LIFE --> CORE["core / models"]
@@ -53,6 +55,7 @@ flowchart BT
     VER["verifier"] --> CORE
     DS["datasets"] --> CORE
     MET["metrics"] --> CORE
+    EVAL --> MET
     PIPE --> MET
 ```
 
@@ -62,7 +65,7 @@ flowchart BT
 |---|---|
 | `execution` import `adapters` | 执行器只跑 agent，不感知 memory 产品 |
 | `lifecycle` import Harbor 实现类 | 只依赖 `SessionExecutor` 协议 |
-| `metrics` 依赖 adapters / execution 实现 | 指标层只吃 `EvalResult` / `EvalTask` |
+| `metrics` 依赖 adapters / execution 实现 | 计算器只接收 `MetricInput`（`task` + `TaskExecution`）。`EvalResult` 不是指标层输入 |
 | `adapters` import `verifier` | 瞬时重试用 `core.retry` |
 | 在 ingestion / runner 里写 `if lib == "mem0"` | 产品差异封进 adapter |
 | 执行器里读产品专有键（如 `hermes_*_mount`） | 统一走 `memory_mounts` 契约，见 `docs/adapters/memory-injection-contract.md` |

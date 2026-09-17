@@ -54,7 +54,7 @@ class EfficiencyResult(BaseModel):
 class TraceResult(BaseModel):
     """Agent 行为体检（Trace）：轨迹采到没、有没有真的用 memory、跑挂没。
 
-    全部来自已采集数据（session_outcomes + memory_ops），不需要额外探测。
+    全部来自已采集数据（TaskExecution.sessions + memory_ops），不需要额外探测。
     ⚠️ ``memory_tool_used`` 只统计 agent 侧读写（add/replace/remove/search）；
     setup/inject/snapshot 是框架动作，不算 agent 用了 memory。
     """

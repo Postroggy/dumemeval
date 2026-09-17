@@ -28,6 +28,7 @@ class DatasetSpec(BaseModel):
     cache: str
     format: Literal["json", "jsonl"]
     smoke: str | None = None
+    prepare_note: str | None = None
 
 
 DEFAULT_CACHE = Path.home() / ".cache" / "dumemeval" / "datasets"
@@ -64,13 +65,35 @@ DATASET_REGISTRY: dict[str, DatasetSpec] = {
         cache="memoryarena/bundled_shopping.jsonl",
         format="jsonl",
         smoke="shopping",
+        prepare_note=(
+            "这只是任务文件（目标 ASIN）。官方 webshop 商品库与 env server\n"
+            "需另按 MemoryArena setup_web_shopping.md 启动（默认 :8005），\n"
+            "否则 shopping 官方 ASIN 分恒为 0——这是环境缺口，不是模型分数。"
+        ),
     ),
 }
+
+# CLI / 配置别名：用户写 shopping，注册表键是 bundled_shopping。
+PREPARE_ALIASES: dict[str, str] = {"shopping": "bundled_shopping"}
 
 
 def dataset_names() -> list[str]:
     """已注册的逻辑数据名。"""
     return sorted(DATASET_REGISTRY)
+
+
+def downloadable_names() -> list[str]:
+    """``dumemeval prepare`` 能下载的数据集（注册表里有 source）。"""
+    return sorted(name for name, spec in DATASET_REGISTRY.items() if spec.source)
+
+
+def prepare_cli_names() -> list[str]:
+    """prepare 子命令接受的名字：可下载项 + 别名。"""
+    return sorted({*downloadable_names(), *PREPARE_ALIASES})
+
+
+def canonical_dataset_name(name: str) -> str:
+    return PREPARE_ALIASES.get(name, name)
 
 
 def resolve_dataset(name: str, root: Path | None = None) -> Path | None:
@@ -184,7 +207,7 @@ def slice_shopping_smoke(rows: list[Any], *, n_rounds: int = 2) -> list[dict[str
 
 def prepare_dataset(name: str, *, root: Path | None = None, force: bool = False) -> dict[str, Path]:
     """按注册的 DatasetSpec 准备数据；没有 smoke 转换时只返回 full。"""
-    key = "bundled_shopping" if name == "shopping" else name
+    key = canonical_dataset_name(name)
     spec = DATASET_REGISTRY.get(key)
     if spec is None:
         raise ValueError(f"Unknown dataset: {name!r}. Supported: {dataset_names()}")
@@ -208,35 +231,3 @@ def prepare_dataset(name: str, *, root: Path | None = None, force: bool = False)
         )
         return {"full": full, "smoke": smoke}
     return {"full": full}
-
-
-def prepare_locomo(*, root: Path | None = None, force: bool = False) -> dict[str, Path]:
-    root = root or cache_root()
-    full = locomo_full_path(root)
-    smoke = locomo_smoke_path(root)
-    if force or not full.exists():
-        _download(DATASET_REGISTRY["locomo"]["source"], full)
-    payload = json.loads(full.read_text())
-    if not isinstance(payload, list):
-        raise ValueError(f"unexpected locomo shape: {type(payload)}")
-    smoke.write_text(json.dumps(slice_locomo_smoke(payload), ensure_ascii=False, indent=2))
-    return {"full": full, "smoke": smoke}
-
-
-def prepare_shopping(*, root: Path | None = None, force: bool = False) -> dict[str, Path]:
-    """下载 bundled_shopping 任务 jsonl 并切 smoke。
-
-    这只是**任务文件**（目标 ASIN）。官方 webshop 商品库仍需按
-    MemoryArena setup_web_shopping.md 另下，env server 才能出 ASIN 分。
-    """
-    root = root or cache_root()
-    full = shopping_full_path(root)
-    smoke = shopping_smoke_path(root)
-    if force or not full.exists():
-        _download(DATASET_REGISTRY["bundled_shopping"]["source"], full)
-    rows = [json.loads(line) for line in full.read_text().splitlines() if line.strip()]
-    smoke.parent.mkdir(parents=True, exist_ok=True)
-    with smoke.open("w") as out:
-        for row in slice_shopping_smoke(rows):
-            out.write(json.dumps(row, ensure_ascii=False) + "\n")
-    return {"full": full, "smoke": smoke}

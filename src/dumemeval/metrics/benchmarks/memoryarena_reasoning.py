@@ -42,6 +42,7 @@ class MemoryArenaReasoningCalculator(MetricCalculator):
 
     kind: ClassVar[MetricKind] = "benchmark"
     name: ClassVar[str] = "memoryarena_math"
+    metrics: ClassVar[tuple[str, ...]] = ("is_correct",)
 
     def __init__(self, judge: JudgeFn | None = None, llm_config: dict[str, Any] | None = None):
         self._judge = judge

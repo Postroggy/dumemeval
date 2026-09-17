@@ -15,7 +15,6 @@ from pydantic import BaseModel, Field
 from ...models import (
     AgentOutput,
     EfficiencyResult,
-    EvalResult,
     EvalTask,
     MemoryFact,
     MetricReport,
@@ -33,12 +32,14 @@ MetricKind = Literal["quality", "utility", "efficiency", "trace", "benchmark"]
 class MetricInput(BaseModel):
     """Typed facts available to cross-cutting metric calculators."""
 
-    model_config = {"arbitrary_types_allowed": True}
+    model_config = {"arbitrary_types_allowed": True, "populate_by_name": True}
 
-    task: EvalTask
-    execution: TaskExecution
+    task: EvalTask | None = None
+    execution: TaskExecution | None = None
     samples: list[SampleResult] = Field(default_factory=list)
     benchmark: Any | None = None
+    provided_outputs: list[AgentOutput] = Field(default_factory=list, alias="outputs")
+    provided_outcomes: list[SessionOutcome] = Field(default_factory=list, alias="outcomes")
     memory_files: dict[str, str] = Field(default_factory=dict)
     ground_truth_facts: list[MemoryFact] = Field(default_factory=list)
     probe_events: list[dict[str, Any]] = Field(default_factory=list)
@@ -46,10 +47,16 @@ class MetricInput(BaseModel):
 
     @property
     def outputs(self) -> list[AgentOutput]:
+        if self.provided_outputs:
+            return self.provided_outputs
         return [AgentOutput(query=s.query, output=s.response) for s in self.samples]
 
     @property
     def outcomes(self) -> list[SessionOutcome]:
+        if self.provided_outcomes:
+            return self.provided_outcomes
+        if self.execution is None:
+            return []
         return self.execution.sessions
 
 
@@ -68,10 +75,11 @@ class MetricCalculator(ABC):
 
     name: ClassVar[str]
     kind: ClassVar[MetricKind]
+    metrics: ClassVar[tuple[str, ...] | list[str]] = ()
 
     @abstractmethod
     def calculate(self, inp: MetricInput) -> MetricBundle:
-        """计算指标，必要时回写 inp.result 的类型化字段。"""
+        """计算指标，返回 bundle。"""
         raise NotImplementedError
 
 
@@ -100,7 +108,7 @@ class AggregatedMetrics(BaseModel):
 
 
 class MetricsAggregator:
-    """统一入口：按序跑计算器，写回横向 metrics 字段（+ 类型化字段）；不处理 benchmark 结果。。"""
+    """统一入口：按序跑计算器，写回横向 metrics 字段（+ 类型化字段）；不处理 benchmark 结果。"""
 
     def __init__(self, calculators: list[MetricCalculator]):
         self.calculators = calculators
@@ -115,6 +123,7 @@ class MetricsAggregator:
         aggregated = AggregatedMetrics(bundles=bundles)
         values = {b.kind: b for b in bundles}
         return MetricReport(
+            bundles=bundles,
             quality=_quality_result(values.get("quality")),
             utility=_utility_result(values.get("utility")),
             efficiency=_efficiency_result(values.get("efficiency")),
@@ -123,44 +132,33 @@ class MetricsAggregator:
         )
 
 
-def _quality_result(b):
+def _quality_result(bundle: MetricBundle | None) -> QualityResult | None:
     return _bundle_model(
-        b, QualityResult, {"precision": 0.0, "recall": 0.0, "hallucination_rate": 0.0, "omission_rate": 0.0}
+        bundle,
+        QualityResult,
+        {"precision": 0.0, "recall": 0.0, "hallucination_rate": 0.0, "omission_rate": 0.0},
     )
 
 
-def _utility_result(b):
-    return _bundle_model(b, UtilityResult, {})
+def _utility_result(bundle: MetricBundle | None) -> UtilityResult | None:
+    return _bundle_model(bundle, UtilityResult, {})
 
 
-def _efficiency_result(b):
-    return _bundle_model(b, EfficiencyResult, {})
+def _efficiency_result(bundle: MetricBundle | None) -> EfficiencyResult | None:
+    return _bundle_model(bundle, EfficiencyResult, {})
 
 
-def _trace_result(b):
-    return _bundle_model(b, TraceResult, {})
+def _trace_result(bundle: MetricBundle | None) -> TraceResult | None:
+    return _bundle_model(bundle, TraceResult, {})
 
 
-def _bundle_model(bundle, model, defaults):
+def _bundle_model[TResult: (QualityResult, UtilityResult, EfficiencyResult, TraceResult)](
+    bundle: MetricBundle | None, model: type[TResult], defaults: dict[str, float]
+) -> TResult | None:
     if bundle is None:
         return None
     data = {**defaults, **bundle.values, "details": bundle.details}
     return model.model_validate(data)
-
-
-def session_records_to_outcomes(records: list[dict[str, Any]]) -> list[SessionOutcome]:
-    """EvalResult.session_outcomes（dict）→ SessionOutcome。"""
-    return [
-        SessionOutcome(
-            session_id=int(rec.get("session_id", 1)),
-            success=bool(rec.get("success", False)),
-            observation=str(rec.get("observation", "")),
-            error=rec.get("error"),
-            tokens_in=int(rec.get("tokens_in", 0) or 0),
-            tokens_out=int(rec.get("tokens_out", 0) or 0),
-        )
-        for rec in records
-    ]
 
 
 def query_of(item: Any) -> str:
@@ -200,31 +198,24 @@ def round_items(inp: MetricInput) -> Iterator[tuple[int, Any, str, Any, str]]:
         yield idx, question, query, gold, pred
 
 
-def outputs_from_result(task: EvalTask | None, result: EvalResult) -> list[AgentOutput]:
-    """从 session observation 构造 AgentOutput。
+def outputs_from_execution(task: EvalTask | None, execution: TaskExecution) -> list[AgentOutput]:
+    """从 TaskExecution.sessions 构造 AgentOutput。
 
-    优先路径（精确）：``session_outcomes[].query`` 由 SessionRunner 从
-    ``SessionSpec.query`` 回填——只要 build_tasks 显式设置了该字段，就按
-    query 精确匹配 observation，不依赖 session 在序列里的位置。
-
-    兼容路径（近似，仅当 outcomes 完全没有 query 时触发）：假设 sessions
-    尾部恰好是"每个 question 一个 session"，按位置切片对齐。这对 travel
-    这类"session 数 != question 数"（有 memory 注入轮）的任务不成立，
-    只在旧任务/未设置 query 时兜底，并在结果里打上 "approximate" 标记。
+    有 ``SessionOutcome.query`` 时按问题精确匹配；否则按位置对齐
+    （session 数必须和 question 数一致才准确）。
     """
     if task is None:
         return []
     data = task.data if isinstance(task.data, dict) else {}
-    outcomes = result.session_outcomes
+    sessions = execution.sessions
 
     by_query: dict[str, str] = {}
-    for rec in outcomes:
-        query = rec.get("query")
-        if query:
-            by_query[str(query)] = str(rec.get("observation") or "")
+    for rec in sessions:
+        if rec.query:
+            by_query[rec.query] = rec.observation or ""
     has_query_mapping = bool(by_query)
 
-    observations = [str(rec.get("observation") or "") for rec in outcomes]
+    observations = [rec.observation or "" for rec in sessions]
     last = observations[-1] if observations else ""
 
     qa_items = data.get("qa")
@@ -234,9 +225,6 @@ def outputs_from_result(task: EvalTask | None, result: EvalResult) -> list[Agent
             query = query_of(item)
             if not query:
                 continue
-            # qa 类任务（LoCoMo）：全部问题共用同一个问答回合 session，
-            # 该 session 通常没有单独的 query（它回答的是全部问题），
-            # 故此处保留"取最后一次 observation"的语义，与 has_query_mapping 无关。
             outputs.append(AgentOutput(query=query, output=by_query.get(query, last)))
         return outputs
 
@@ -248,7 +236,6 @@ def outputs_from_result(task: EvalTask | None, result: EvalResult) -> list[Agent
     if has_query_mapping:
         return [AgentOutput(query=query, output=by_query.get(query, "")) for query in queries if query]
 
-    # 兼容路径：无 query 映射时按位置切片（仅当 session 数 == question 数才准确）。
     scored = observations[-len(queries) :] if len(observations) >= len(queries) else observations
     outputs = []
     for idx, query in enumerate(queries):

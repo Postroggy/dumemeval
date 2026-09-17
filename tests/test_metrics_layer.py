@@ -22,11 +22,19 @@ from dumemeval.metrics import (
 )
 from dumemeval.metrics.benchmarks.locomo import locomo_f1, locomo_f1_multi, score_locomo_f1
 from dumemeval.metrics.benchmarks.memoryarena import judge_round
-from dumemeval.models import AgentOutput, EvalResult, EvalTask, MemoryFact, MemoryOp
+from dumemeval.models import AgentOutput, EvalTask, MemoryFact, MemoryOp, TaskExecution
 
 
-def _result() -> EvalResult:
-    return EvalResult(task_name="t", memory_backend="m")
+def _execution(
+    *, sessions: list[SessionOutcome] | None = None, ops: list[MemoryOp] | None = None
+) -> TaskExecution:
+    return TaskExecution(
+        task_id="t",
+        task_name="t",
+        memory_backend="m",
+        sessions=sessions or [],
+        memory_ops=ops or [],
+    )
 
 
 class TestLocomoOfficialF1:
@@ -108,15 +116,17 @@ class TestMemoryArenaJudgement:
 
 class TestAggregator:
     def test_one_eval_one_flat_report(self) -> None:
-        result = _result()
-        result.memory_ops = [
-            MemoryOp(session_id=1, op="add", content="a", timestamp=100.0),
-            MemoryOp(session_id=1, op="add", content="b", timestamp=100.5),
-        ]
         outcomes = [
             SessionOutcome(session_id=1, success=True, tokens_in=100, tokens_out=50),
             SessionOutcome(session_id=2, success=True, tokens_in=100, tokens_out=50),
         ]
+        execution = _execution(
+            sessions=outcomes,
+            ops=[
+                MemoryOp(session_id=1, op="add", content="a", timestamp=100.0),
+                MemoryOp(session_id=1, op="add", content="b", timestamp=100.5),
+            ],
+        )
         task = EvalTask(
             name="t",
             data={
@@ -139,9 +149,8 @@ class TestAggregator:
             ]
         ).run(
             MetricInput(
-                result=result,
                 task=task,
-                outcomes=outcomes,
+                execution=execution,
                 outputs=outputs,
                 memory_files={"m.md": "latte monday"},
                 ground_truth_facts=[MemoryFact(fact="latte"), MemoryFact(fact="monday")],
@@ -151,12 +160,12 @@ class TestAggregator:
         assert aggregated.bundle("utility") is not None
         assert aggregated.bundle("efficiency") is not None
         benchmark = CalculatorBenchmarkScorer("locomo", judge=lambda p, g, q: p.lower() == g.lower()).score(
-            MetricInput(result=result, task=task, outcomes=outcomes, outputs=outputs)
+            MetricInput(task=task, execution=execution, outputs=outputs)
         )
         assert benchmark.benchmark == "locomo"
-        assert result.metrics["quality.recall"] == 1.0
-        assert result.metrics["utility.success_rate"] == 1.0
-        assert result.metrics["efficiency.tokens_in"] == 200.0
+        assert aggregated.flat["quality.recall"] == 1.0
+        assert aggregated.flat["utility.success_rate"] == 1.0
+        assert aggregated.flat["efficiency.tokens_in"] == 200.0
         assert benchmark.values["f1"] == 1.0
         assert benchmark.values["accuracy_multi_hop"] == 1.0
         assert benchmark.values["accuracy_temporal_reasoning"] == 1.0
@@ -198,53 +207,12 @@ class TestAggregator:
 
             _reg._REGISTRY.pop("toy_contrib", None)
 
+    def test_declared_metric_names_use_classvar(self) -> None:
+        from dumemeval.evaluation import declared_metric_names
 
-class TestApplyBundleNoGhostData:
-    """bundle 完整定义本次结果：缺 key 回默认值，不保留上一次的旧值。"""
-
-    def test_partial_bundle_resets_missing_fields(self) -> None:
-        from dumemeval.metrics.core.base import MetricBundle, _apply_bundle
-        from dumemeval.models import QualityResult
-
-        # 先写入一份"旧的"非零结果，模拟上一次评测
-        result = _result()
-        result.quality = QualityResult(
-            precision=0.9,
-            recall=0.8,
-            hallucination_rate=0.1,
-            omission_rate=0.2,
-            update_accuracy=0.7,
-            details=[{"fact": "stale"}],
-        )
-
-        # 一个只写了 precision 的部分 bundle
-        bundle = MetricBundle(
-            name="quality", kind="quality", values={"precision": 0.5}, details=[{"fact": "new"}]
-        )
-        _apply_bundle(result, bundle)
-
-        # 缺失的字段必须归零（不是旧值 0.8/0.1/0.2/0.7）
-        assert result.quality.precision == 0.5
-        assert result.quality.recall == 0.0
-        assert result.quality.hallucination_rate == 0.0
-        assert result.quality.omission_rate == 0.0
-        # update_accuracy 例外：缺 key = 未测 → None（不是旧值 0.7，也不伪造成 0.0）
-        assert result.quality.update_accuracy is None
-        # details 也是新值，不是旧的 stale
-        assert result.quality.details == [{"fact": "new"}]
-
-    def test_partial_utility_bundle_resets_missing_fields(self) -> None:
-        from dumemeval.metrics.core.base import MetricBundle, _apply_bundle
-        from dumemeval.models import UtilityResult
-
-        result = _result()
-        result.utility = UtilityResult(
-            task_success=True, success_rate=0.9, turns=5, cost_usd=1.5, memory_conditioned_gain=0.3
-        )
-        bundle = MetricBundle(name="utility", kind="utility", values={"success_rate": 0.5})
-        _apply_bundle(result, bundle)
-        assert result.utility.success_rate == 0.5
-        assert result.utility.task_success is False
-        assert result.utility.turns == 0
-        assert result.utility.cost_usd == 0.0
-        assert result.utility.memory_conditioned_gain == 0.0
+        assert declared_metric_names("memoryarena_shopping") == [
+            "match_ground_truth",
+            "overall_success",
+            "attribute_match",
+        ]
+        assert declared_metric_names("nope") == []

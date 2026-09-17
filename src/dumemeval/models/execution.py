@@ -25,6 +25,10 @@ class SessionOutcome(BaseModel):
         default=None,
         description="本 session 对应的 Harbor trial 目录（含 agent/trajectory.json 等原始产物）；mock 或未产出时 None",
     )
+    query: str | None = Field(
+        default=None,
+        description="该 session 对应的 benchmark 问题原文；非问答 session 为 None",
+    )
 
 
 class MemoryMount(BaseModel):
@@ -39,11 +43,20 @@ class MemoryMount(BaseModel):
     container_path: str = Field(description="agent 环境内的绝对路径")
 
 
+MemoryOpName = Literal["setup", "inject", "snapshot", "add", "replace", "remove", "search"]
+MEMORY_WRITE_OPS: frozenset[str] = frozenset({"add", "replace", "remove"})
+MEMORY_READ_OPS: frozenset[str] = frozenset({"search"})
+
+
 class MemoryOp(BaseModel):
-    """观测到的 memory 读写操作（Quality 数据源）。"""
+    """观测到的 memory 读写操作（Quality / Efficiency / Trace 共用）。
+
+    ``op`` 是框架词表，不是产品 API 名。adapter 必须在记录时映射过来：
+    写入类用 add/replace/remove，检索用 search；setup/inject/snapshot 是框架动作。
+    """
 
     session_id: int = Field(ge=0)
-    op: str = Field(description='"add" / "search" / "inject" / "snapshot"')
+    op: MemoryOpName
     content: str = Field(default="", description="写入/检索的内容")
     query: str = Field(default="", description="检索 query")
     timestamp: float = 0.0

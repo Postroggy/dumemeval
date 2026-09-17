@@ -58,7 +58,7 @@ execution:
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL}
     mounts:
       - type: bind
-        source: /Users/yueqi/Coding/Agent/Memroy/Eval/dumemeval/results/memory/directory-demo
+        source: results/memory/directory-demo
         target: /app/memory
 
 output:

@@ -7,20 +7,19 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dumemeval.metrics.dimensions.quality import QualityEvaluator
-from dumemeval.models import EvalResult, MemoryFact
+from dumemeval.models import MemoryFact
 
 
 class TestQualityEvaluator:
     def test_rule_verifier_recall(self) -> None:
         """规则判分：memory 内容包含 ground truth fact 时 recall=1。"""
         qe = QualityEvaluator({"type": "rule"})
-        result = EvalResult(task_name="t", memory_backend="m")
         memory_files = {"pref.md": "Alice likes latte without sugar\nAlice prefers window seat"}
         facts = [
             MemoryFact(fact="latte", category="preference"),
             MemoryFact(fact="window seat", category="preference"),
         ]
-        qr = qe.evaluate(result, memory_files, facts)
+        qr = qe.score_memory(memory_files, facts)
         assert qr.recall == 1.0
         assert qr.precision == 1.0  # 单条记忆命中全部事实
         assert qr.hallucination_rate == 0.0
@@ -29,43 +28,39 @@ class TestQualityEvaluator:
     def test_rule_verifier_miss(self) -> None:
         """memory 缺少事实时 recall=0，omission=1。"""
         qe = QualityEvaluator({"type": "rule"})
-        result = EvalResult(task_name="t", memory_backend="m")
         memory_files = {"pref.md": "Alice likes tea"}
         facts = [MemoryFact(fact="latte", category="preference")]
-        qr = qe.evaluate(result, memory_files, facts)
+        qr = qe.score_memory(memory_files, facts)
         assert qr.recall == 0.0
         assert qr.omission_rate == 1.0
 
     def test_empty_ground_truth(self) -> None:
         """无 ground truth 时返回空结果。"""
         qe = QualityEvaluator({"type": "rule"})
-        result = EvalResult(task_name="t", memory_backend="m")
-        qr = qe.evaluate(result, {}, [])
+        qr = qe.score_memory({}, [])
         assert qr.recall == 0.0 and qr.precision == 0.0
 
     def test_partial_recall(self) -> None:
         """部分命中时 recall 为比例。"""
         qe = QualityEvaluator({"type": "rule"})
-        result = EvalResult(task_name="t", memory_backend="m")
         memory_files = {"pref.md": "Alice likes latte"}
         facts = [
             MemoryFact(fact="latte", category="preference"),
             MemoryFact(fact="window seat", category="preference"),
         ]
-        qr = qe.evaluate(result, memory_files, facts)
+        qr = qe.score_memory(memory_files, facts)
         assert qr.recall == 0.5
         assert qr.omission_rate == 0.5
 
     def test_hallucination_detected(self) -> None:
         """多余记忆文件（无关内容）降低 precision，hallucination > 0。"""
         qe = QualityEvaluator({"type": "rule"})
-        result = EvalResult(task_name="t", memory_backend="m")
         memory_files = {
             "good.md": "Alice likes latte",
             "noise.md": "random unrelated note about weather",
         }
         facts = [MemoryFact(fact="latte", category="preference")]
-        qr = qe.evaluate(result, memory_files, facts)
+        qr = qe.score_memory(memory_files, facts)
         assert qr.recall == 1.0
         assert qr.precision == 0.5  # 2 条记忆只有 1 条命中
         assert qr.hallucination_rate == 0.5
@@ -73,7 +68,6 @@ class TestQualityEvaluator:
     def test_multi_memory_files(self) -> None:
         """多记忆文件时 precision = 命中数 / 记忆数。"""
         qe = QualityEvaluator({"type": "rule"})
-        result = EvalResult(task_name="t", memory_backend="m")
         memory_files = {
             "a.md": "latte",
             "b.md": "window seat",
@@ -83,7 +77,7 @@ class TestQualityEvaluator:
             MemoryFact(fact="latte", category="preference"),
             MemoryFact(fact="window seat", category="preference"),
         ]
-        qr = qe.evaluate(result, memory_files, facts)
+        qr = qe.score_memory(memory_files, facts)
         assert qr.recall == 1.0
         assert qr.precision == 2 / 3
 
@@ -215,19 +209,16 @@ class TestQualityEvaluatorProbeIntegration:
     def test_probe_events_merged_into_judging(self) -> None:
         """probe_events 的 memory_write 内容合并进判分输入。"""
         qe = QualityEvaluator({"type": "rule"})
-        result = EvalResult(task_name="t", memory_backend="m")
-        # memory 文件为空，但探测到写入事件包含事实
         memory_files: dict[str, str] = {}
         facts = [MemoryFact(fact="latte", category="preference")]
         probe_events = [{"type": "memory_write", "content": "Alice likes latte without sugar"}]
-        qr = qe.evaluate(result, memory_files, facts, probe_events=probe_events)
+        qr = qe.score_memory(memory_files, facts, probe_events=probe_events)
         assert qr.recall == 1.0  # 探测内容命中
 
     def test_no_probe_events_no_change(self) -> None:
         """无 probe_events 时行为不变。"""
         qe = QualityEvaluator({"type": "rule"})
-        result = EvalResult(task_name="t", memory_backend="m")
         memory_files = {"a.md": "Alice likes tea"}
         facts = [MemoryFact(fact="latte", category="preference")]
-        qr = qe.evaluate(result, memory_files, facts)
+        qr = qe.score_memory(memory_files, facts)
         assert qr.recall == 0.0

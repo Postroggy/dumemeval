@@ -107,6 +107,7 @@ class MemoryArenaShoppingCalculator(MetricCalculator):
 
     name: ClassVar[str] = "memoryarena_shopping"
     kind: ClassVar[MetricKind] = "benchmark"
+    metrics: ClassVar[tuple[str, ...]] = ("match_ground_truth", "overall_success", "attribute_match")
 
     def calculate(self, inp: MetricInput) -> MetricBundle:
         details: list[dict[str, Any]] = []

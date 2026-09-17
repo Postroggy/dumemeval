@@ -10,6 +10,8 @@
 import sys
 from pathlib import Path
 
+from pytest import MonkeyPatch
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dumemeval.cli.run import _build_tasks
@@ -134,7 +136,10 @@ class TestTestOnlyBenchmark:
 class TestSmokeConfigsLoad:
     """默认 real smoke yaml 能 load + build（数据捆绑在仓库 data/smoke/，零下载）。"""
 
-    def test_locomo_test_only_normalizes(self) -> None:
+    def test_locomo_test_only_normalizes(self, monkeypatch: MonkeyPatch) -> None:
+        monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "test")
+        monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://example.invalid")
+        monkeypatch.setenv("ANTHROPIC_MODEL", "test")
         cfg_path = Path(__file__).parent.parent / "configs" / "smoke" / "locomo_test_only.yaml"
         data = Path(__file__).parent.parent / "data" / "smoke" / "locomo_smoke.json"
         assert data.exists(), "捆绑 smoke 数据缺失（data/smoke/locomo_smoke.json）"
@@ -144,8 +149,11 @@ class TestSmokeConfigsLoad:
         assert all(not s.memory_inject for t in tasks for s in t.sessions)
         assert all(t.memory_instruction == "none" for t in tasks)
 
-    def test_shopping_transfer_builds(self) -> None:
+    def test_shopping_transfer_builds(self, monkeypatch: MonkeyPatch) -> None:
         """shopping smoke 配置能用捆绑数据构建出 >=2 session 的任务（协议要求）。"""
+        monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "test")
+        monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://example.invalid")
+        monkeypatch.setenv("ANTHROPIC_MODEL", "test")
         cfg_path = Path(__file__).parent.parent / "configs" / "smoke" / "shopping_transfer.yaml"
         data = Path(__file__).parent.parent / "data" / "smoke" / "shopping_smoke.jsonl"
         assert data.exists(), "捆绑 shopping smoke 数据缺失"

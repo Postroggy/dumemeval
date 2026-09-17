@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any, Literal, cast
 
 from .base import MetricCalculator
@@ -34,6 +34,18 @@ def register_calculator(cls: type[MetricCalculator], *aliases: str) -> type[Metr
 def calculator_names() -> list[str]:
     """已注册的规范名（按 ClassVar name 去重）。"""
     return sorted({cls.name for cls in _REGISTRY.values()})
+
+
+def declared_metric_names(name: str) -> list[str]:
+    """Official metric names declared by a registered calculator."""
+    key = _ALIASES.get(name.strip().lower(), name.strip().lower())
+    cls = _REGISTRY.get(key)
+    if cls is None:
+        return []
+    declared = getattr(cls, "metrics", ())
+    if isinstance(declared, Sequence) and not isinstance(declared, (str, bytes)):
+        return [item for item in declared if isinstance(item, str)]
+    return []
 
 
 def get_benchmark_calculator(

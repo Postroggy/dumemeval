@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dumemeval.config import load_config
-from dumemeval.models import EvalResult, EvalTask, SessionSpec
+from dumemeval.models import EvalTask, SessionOutcome, SessionSpec, TaskExecution, TaskResult
 from dumemeval.pipeline.run_index import write_run_index
 from dumemeval.provenance import derive_run_id
 
@@ -58,7 +58,7 @@ class TestDeriveRunId:
 
 
 class TestWriteRunIndex:
-    def _results(self, tmp_path: Path, *, with_trial: bool) -> tuple[list[EvalTask], list[EvalResult]]:
+    def _results(self, tmp_path: Path, *, with_trial: bool) -> tuple[list[EvalTask], list[TaskResult]]:
         tasks = [
             EvalTask(
                 name="t0",
@@ -66,25 +66,36 @@ class TestWriteRunIndex:
                 benchmark="locomo",
             )
         ]
-        recs = []
+        sessions: list[SessionOutcome] = []
         for sid in (1, 2):
-            rec = {
-                "session_id": sid,
-                "success": True,
-                "observation": "obs",
-                "error": None,
-                "tokens_in": 10,
-                "tokens_out": 5,
-                "query": None,
-                "trial_dir": None,
-            }
+            trial_dir = None
             if with_trial:
                 trial = tmp_path / f"trials/dumemeval_t0__session_{sid}"
                 (trial / "agent").mkdir(parents=True, exist_ok=True)
                 (trial / "agent" / "trajectory.json").write_text("{}")
-                rec["trial_dir"] = str(trial)
-            recs.append(rec)
-        results = [EvalResult(task_name="t0", memory_backend="directory-m", session_outcomes=recs)]
+                trial_dir = str(trial)
+            sessions.append(
+                SessionOutcome(
+                    session_id=sid,
+                    success=True,
+                    observation="obs",
+                    tokens_in=10,
+                    tokens_out=5,
+                    trial_dir=trial_dir,
+                )
+            )
+        results = [
+            TaskResult(
+                task_id="t0",
+                task_name="t0",
+                execution=TaskExecution(
+                    task_id="t0",
+                    task_name="t0",
+                    memory_backend="directory-m",
+                    sessions=sessions,
+                ),
+            )
+        ]
         return tasks, results
 
     def test_index_marks_complete_with_trials(self, tmp_path: Path) -> None:

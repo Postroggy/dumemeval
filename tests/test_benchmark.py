@@ -15,7 +15,7 @@ from dumemeval.datasets.benchmarks.memoryarena_travel import MemoryArenaTravelDa
 from dumemeval.evaluation import CalculatorBenchmarkScorer
 from dumemeval.metrics.benchmarks.locomo import locomo_f1
 from dumemeval.metrics.core.base import MetricInput
-from dumemeval.models import AgentOutput, EvalResult
+from dumemeval.models import AgentOutput
 
 
 @pytest.fixture
@@ -142,9 +142,7 @@ class TestLoCoMo:
         ]
         a._judge_correct = lambda pred, gold, question: pred.lower() == gold.lower()  # type: ignore[method-assign]
         metrics = CalculatorBenchmarkScorer("locomo", judge=lambda p, g, q: p.lower() == g.lower()).score(
-            MetricInput(
-                result=EvalResult(task_name=task.name, memory_backend="m"), task=task, outputs=outputs
-            )
+            MetricInput(task=task, outputs=outputs)
         )
         assert metrics.benchmark == "locomo"
         assert metrics.values["accuracy"] == 1.0
@@ -161,7 +159,6 @@ class TestLoCoMo:
         a._judge_correct = lambda pred, gold, question: pred.lower() == gold.lower()  # type: ignore[method-assign]
         metrics = CalculatorBenchmarkScorer("locomo", judge=lambda p, g, q: p.lower() == g.lower()).score(
             MetricInput(
-                result=EvalResult(task_name=task.name, memory_backend="m"),
                 task=task,
                 outputs=[AgentOutput(query="What does Alice like to drink?", output="latte")],
             )
@@ -206,9 +203,7 @@ class TestMemoryArenaTravel:
             ),
         ]
         metrics = CalculatorBenchmarkScorer("memoryarena_travel").score(
-            MetricInput(
-                result=EvalResult(task_name=task.name, memory_backend="m"), task=task, outputs=outputs
-            )
+            MetricInput(task=task, outputs=outputs)
         )
         assert metrics.values["round_success"] == 1.0
         assert metrics.details[0]["judgement_mode"] == "hint"
@@ -227,9 +222,7 @@ class TestMemoryArenaTravel:
             ),
         ]
         metrics = CalculatorBenchmarkScorer("memoryarena_travel").score(
-            MetricInput(
-                result=EvalResult(task_name=task.name, memory_backend="m"), task=task, outputs=outputs
-            )
+            MetricInput(task=task, outputs=outputs)
         )
         assert metrics.values["round_success"] == 0.0
 

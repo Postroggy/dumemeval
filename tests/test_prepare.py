@@ -104,38 +104,49 @@ class TestBundledSmokeFiles:
         assert len(row["answers"]) == 2
 
 
+class TestPrepareRegistry:
+    def test_downloadable_excludes_bundled_smoke(self) -> None:
+        from dumemeval.datasets.prepare import dataset_names, downloadable_names, prepare_cli_names
+
+        names = downloadable_names()
+        assert "locomo" in names
+        assert "bundled_shopping" in names
+        assert "locomo_smoke" not in names
+        assert "shopping_smoke" not in names
+        assert set(names) <= set(dataset_names())
+        assert "shopping" in prepare_cli_names()
+        assert set(names) <= set(prepare_cli_names())
+
+
 class TestCmdPrepare:
     """``dumemeval prepare`` CLI（下载函数 monkeypatch，不打网络）。"""
 
-    def test_all_calls_both(self, monkeypatch: Any) -> None:
+    def test_all_calls_downloadable_registry(self, monkeypatch: Any) -> None:
         from dumemeval.cli import main
+        from dumemeval.datasets.prepare import downloadable_names
 
         called: list[str] = []
 
-        def fake_locomo(**kwargs: Any) -> dict[str, Path]:
-            called.append("locomo")
+        def fake_prepare(name: str, **kwargs: Any) -> dict[str, Path]:
+            called.append(name)
             return {"full": Path("/tmp/f"), "smoke": Path("/tmp/s")}
 
-        def fake_shopping(**kwargs: Any) -> dict[str, Path]:
-            called.append("shopping")
-            return {"full": Path("/tmp/f"), "smoke": Path("/tmp/s")}
-
-        monkeypatch.setattr("dumemeval.cli.prepare.prep.prepare_locomo", fake_locomo)
-        monkeypatch.setattr("dumemeval.cli.prepare.prep.prepare_shopping", fake_shopping)
+        monkeypatch.setattr("dumemeval.cli.prepare.prep.prepare_dataset", fake_prepare)
         rc = main(["prepare"])
         assert rc == 0
-        assert called == ["locomo", "shopping"]
+        assert called == downloadable_names()
+        assert "locomo_smoke" not in called
 
     def test_dataset_choice(self, monkeypatch: Any) -> None:
         from dumemeval.cli import main
 
         called: list[str] = []
 
-        def fake_shopping(**kwargs: Any) -> dict[str, Path]:
-            called.append("shopping")
+        def fake_prepare(name: str, **kwargs: Any) -> dict[str, Path]:
+            called.append(name)
             return {"full": Path("/tmp/f"), "smoke": Path("/tmp/s")}
 
-        monkeypatch.setattr("dumemeval.cli.prepare.prep.prepare_shopping", fake_shopping)
+        monkeypatch.setattr("dumemeval.cli.prepare.prep.prepare_dataset", fake_prepare)
         rc = main(["prepare", "--dataset", "shopping", "--root", "/tmp/x"])
         assert rc == 0
         assert called == ["shopping"]
@@ -145,3 +156,6 @@ class TestCmdPrepare:
 
         with pytest.raises(SystemExit):
             build_parser().parse_args(["prepare", "--dataset", "bogus"])
+
+        with pytest.raises(SystemExit):
+            build_parser().parse_args(["prepare", "--dataset", "locomo_smoke"])

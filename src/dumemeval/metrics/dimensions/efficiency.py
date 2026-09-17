@@ -5,7 +5,7 @@ from __future__ import annotations
 from itertools import pairwise
 from typing import ClassVar
 
-from ...models import EfficiencyResult, MemoryOp, SessionOutcome
+from ...models import MEMORY_READ_OPS, MEMORY_WRITE_OPS, EfficiencyResult, MemoryOp, SessionOutcome
 from ..core.base import MetricBundle, MetricCalculator, MetricInput, MetricKind
 
 DEFAULT_INPUT_COST_PER_1K = 0.003
@@ -30,7 +30,7 @@ class EfficiencyEvaluator(MetricCalculator):
         outcomes = [o for o in inp.outcomes if isinstance(o, SessionOutcome)]
         er = EfficiencyResult()
         ops = list(inp.execution.memory_ops) if inp.execution is not None else []
-        writes, searches = self._op_latencies(ops, "add"), self._op_latencies(ops, "search")
+        writes, searches = self._op_latencies(ops, MEMORY_WRITE_OPS), self._op_latencies(ops, MEMORY_READ_OPS)
         er.write_latency_ms = sum(writes) / len(writes) if writes else 0.0
         er.retrieval_latency_ms = sum(searches) / len(searches) if searches else 0.0
         er.tokens_in = sum(o.tokens_in for o in outcomes)
@@ -38,6 +38,18 @@ class EfficiencyEvaluator(MetricCalculator):
         er.cost_usd = (
             er.tokens_in / 1000 * self.input_cost_per_1k + er.tokens_out / 1000 * self.output_cost_per_1k
         )
+        er.details = [
+            {
+                "write_ops": sum(op.op in MEMORY_WRITE_OPS for op in ops),
+                "search_ops": sum(op.op in MEMORY_READ_OPS for op in ops),
+                "avg_write_latency_ms": er.write_latency_ms,
+                "avg_retrieval_latency_ms": er.retrieval_latency_ms,
+                "cost_breakdown": {
+                    "input": er.tokens_in / 1000 * self.input_cost_per_1k,
+                    "output": er.tokens_out / 1000 * self.output_cost_per_1k,
+                },
+            }
+        ]
         return MetricBundle(
             name=self.name,
             kind=self.kind,
@@ -52,11 +64,11 @@ class EfficiencyEvaluator(MetricCalculator):
         )
 
     @staticmethod
-    def _op_latencies(ops: list[MemoryOp], op: str) -> list[float]:
+    def _op_latencies(ops: list[MemoryOp], kinds: frozenset[str]) -> list[float]:
         latencies: list[float] = []
         by_session: dict[int, list[float]] = {}
         for item in ops:
-            if item.op == op and item.timestamp > 0:
+            if item.op in kinds and item.timestamp > 0:
                 by_session.setdefault(item.session_id, []).append(item.timestamp)
         for ts_list in by_session.values():
             ts_list.sort()

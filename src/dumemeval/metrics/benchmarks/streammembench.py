@@ -87,6 +87,12 @@ class StreamMemBenchCalculator(MetricCalculator):
 
     name: ClassVar[str] = "streammembench"
     kind: ClassVar[MetricKind] = "benchmark"
+    metrics: ClassVar[tuple[str, ...]] = (
+        "fidelity",
+        "initial_evidence_use",
+        "feedback_incorporation",
+        "followup_reuse",
+    )
 
     def __init__(self, lang: str = "zh"):
         self.lang = lang if lang in _DET_FEEDBACK else "en"

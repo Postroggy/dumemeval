@@ -15,7 +15,7 @@ from dumemeval.datasets.benchmarks.evermembench_dynamic import (
     EverMemBenchDynamicData,
 )
 from dumemeval.metrics.benchmarks.evermembench_dynamic import evaluate_mc, parse_mc_answer
-from dumemeval.models import AgentOutput, EvalResult
+from dumemeval.models import AgentOutput
 from dumemeval.verifier.base import Verdict
 
 RAW = [
@@ -86,7 +86,7 @@ class TestEverMemBenchAdapter:
             AgentOutput(query=qas[0]["question"], output="D"),
             AgentOutput(query=qas[1]["question"], output="65%"),
         ]
-        metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+        metrics = a.evaluate(task, outputs)
         assert metrics["accuracy"] == 1.0
         assert metrics["accuracy_multiple_choice"] == 1.0
         assert metrics["accuracy_open_ended"] == 1.0
@@ -101,7 +101,7 @@ class TestEverMemBenchAdapter:
             AgentOutput(query=qas[0]["question"], output="A"),
             AgentOutput(query=qas[1]["question"], output="65%"),
         ]
-        metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+        metrics = a.evaluate(task, outputs)
         assert metrics["accuracy_multiple_choice"] == 0.0
 
     def test_oe_no_judge_falls_back_to_llm(self) -> None:
@@ -115,7 +115,7 @@ class TestEverMemBenchAdapter:
         ]
         with patch("dumemeval.verifier.LLMJudgeVerifier.verify_with_prompt") as mock_verify:
             mock_verify.return_value = Verdict(label="", score=0.0, reason="ok", raw='{"label": "CORRECT"}')
-            metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+            metrics = a.evaluate(task, outputs)
         assert metrics["accuracy_open_ended"] == 1.0
         # 官方 prompt 被使用（含 ±1 天宽容条款与占位填充）
         used_prompt = mock_verify.call_args.args[0]

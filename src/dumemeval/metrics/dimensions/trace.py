@@ -1,21 +1,15 @@
 """Trace 指标：agent 行为体检（业务问题「trace 是否正规」）。
 
-数据源全部是已采集内容——session_outcomes（observation/error）+ memory_ops，
-不引入新的探测通道。
-
-bundle 写回逻辑（``apply_trace``）在 ``core/base.py``，与其它维度的回写同处。
+数据源全部是已采集内容——TaskExecution.sessions（observation/error）+ memory_ops，
+不引入新的探测通道。计算器只产出 bundle。
 """
 
 from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from ...models import TraceResult
+from ...models import MEMORY_READ_OPS, MEMORY_WRITE_OPS, SessionOutcome, TraceResult
 from ..core.base import MetricBundle, MetricCalculator, MetricInput, MetricKind
-
-# agent 侧 memory 读写（setup/inject/snapshot 是框架动作，不计入）
-_WRITE_OPS = frozenset({"add", "replace", "remove", "delete"})
-_READ_OPS = frozenset({"search", "query", "retrieve"})
 
 
 class TraceCalculator(MetricCalculator):
@@ -26,14 +20,15 @@ class TraceCalculator(MetricCalculator):
 
     def calculate(self, inp: MetricInput) -> MetricBundle:
         execution = inp.execution
-        outcomes = execution.sessions
+        outcomes = execution.sessions if execution is not None else []
+        ops = execution.memory_ops if execution is not None else []
         total = len(outcomes)
 
         captured = sum(1 for rec in outcomes if str(rec.observation or "").strip())
         errored = sum(1 for rec in outcomes if rec.error or not rec.success)
 
-        writes = sum(1 for op in execution.memory_ops if op.op in _WRITE_OPS)
-        reads = sum(1 for op in execution.memory_ops if op.op in _READ_OPS)
+        writes = sum(1 for op in ops if op.op in MEMORY_WRITE_OPS)
+        reads = sum(1 for op in ops if op.op in MEMORY_READ_OPS)
 
         captured_rate = captured / total if total else 0.0
         trace = TraceResult(
@@ -46,7 +41,7 @@ class TraceCalculator(MetricCalculator):
             details=self._details(outcomes),
         )
 
-        return MetricBundle(
+        bundle = MetricBundle(
             name=self.name,
             kind=self.kind,
             values={
@@ -59,9 +54,10 @@ class TraceCalculator(MetricCalculator):
             },
             details=trace.details,
         )
+        return bundle
 
     @staticmethod
-    def _details(outcomes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _details(outcomes: list[SessionOutcome]) -> list[dict[str, Any]]:
         return [
             {
                 "session_id": rec.session_id,

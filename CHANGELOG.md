@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+### Changed
+- **CI 口径合一**：本地与 GitHub Actions 都只跑 `make ci`（ruff + mypy + pytest +
+  `uv build` + locomo_mini / user_preference mock + smoke 四臂 mock）。workflow
+  不再单独写命令。Harbor 真跑与 coverage 仍不进默认门禁。见
+  `docs/architecture/ci.md`。
+- **`examples/user_preference.yaml`**：bind mount 改为相对路径，去掉本机绝对路径。
+
 ### Fixed
 - **MemoryAgentBench ingest 粒度**：不再把整段 `context` 塞进一个 session。按官方
   `chunk_text_into_sentences`（tiktoken gpt-4o-mini，默认 chunk_size=4096）切块，

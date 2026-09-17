@@ -15,7 +15,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, ClassVar
 
-from ..models import EvalTask, MemoryMount, MemoryOp, MemorySpec, SessionSpec
+from ..models import EvalTask, MemoryMount, MemoryOp, MemoryOpName, MemorySpec, SessionSpec
 
 # session_ctx 里的注入通道键名（执行器消费）
 MEMORY_MOUNTS_KEY = "memory_mounts"
@@ -99,7 +99,7 @@ class BaseMemoryAdapter(ABC):
 
     # ── 共享工具 ────────────────────────────────────────────────────────────
 
-    def _record(self, op: str, session_id: int, content: str = "", query: str = "") -> None:
+    def _record(self, op: MemoryOpName, session_id: int, content: str = "", query: str = "") -> None:
         self._ops.append(
             MemoryOp(
                 session_id=session_id,
@@ -111,6 +111,10 @@ class BaseMemoryAdapter(ABC):
 
     def all_ops(self) -> list[MemoryOp]:
         return list(self._ops)
+
+    def read_memory_files(self) -> dict[str, str]:
+        """Read current memory contents for Quality scoring. Default: none."""
+        return {}
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} name={self.name!r} type={self.spec.type}>"

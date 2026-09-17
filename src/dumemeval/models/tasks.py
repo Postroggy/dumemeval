@@ -31,7 +31,7 @@ class SessionSpec(BaseModel):
         default=None,
         description=(
             "该 session 对应的 benchmark 问题/查询原文（与 task.data 里的 "
-            "question/query 字段完全一致）。用于 outputs_from_result 精确匹配 "
+            "question/query 字段完全一致）。用于 outputs_from_execution 精确匹配 "
             "agent 输出 ↔ 问题，而不是按 session 在序列中的位置猜测——"
             "非问答类 session（如 memory 注入、ingest）留空即可。"
         ),

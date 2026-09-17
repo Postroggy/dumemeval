@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from ..adapters.base import BaseMemoryAdapter
@@ -20,7 +21,7 @@ class EvalPipeline:
     executor: SessionExecutor
     verifier: Verifier | None
     scorer: BenchmarkScorer | None
-    metrics: tuple[MetricCalculator, ...] = ()
+    metrics: Sequence[MetricCalculator] = ()
 
     async def run(self, task: EvalTask) -> TaskResult:
         execution = await SessionRunner(self.memory, self.executor, self.protocol).run(task)

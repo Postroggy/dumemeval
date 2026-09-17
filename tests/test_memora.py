@@ -12,7 +12,7 @@ import dumemeval.datasets.benchmarks  # noqa: F401
 from dumemeval.datasets import get_benchmark
 from dumemeval.datasets.benchmarks.memora import MemoraAdapter, MemoraData
 from dumemeval.metrics.benchmarks.memora import fama_score
-from dumemeval.models import AgentOutput, EvalResult
+from dumemeval.models import AgentOutput
 from dumemeval.verifier.base import Verdict
 
 RAW = [
@@ -87,7 +87,7 @@ class TestMemoraAdapter:
         task = a.build_tasks(MemoraData.from_raw(RAW))[0]
         qas = task.data["questions"]
         outputs = [AgentOutput(query=qas[0]["question"], output="Organize home office")]
-        metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+        metrics = a.evaluate(task, outputs)
         # q1: MPA=1 FAA=1 → FAMA=1
         assert metrics["fama"] == pytest.approx(100.0)
         assert metrics["fama_remembering"] == pytest.approx(100.0)
@@ -101,7 +101,7 @@ class TestMemoraAdapter:
         task = a.build_tasks(MemoraData.from_raw(RAW))[0]
         qas = task.data["questions"]
         outputs = [AgentOutput(query=qas[0]["question"], output="Organize home office")]
-        metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+        metrics = a.evaluate(task, outputs)
         # MPA=1, FAA=0, λ=0.5 → FAMA=0.5 → *100=50
         assert metrics["fama"] == pytest.approx(50.0)
 
@@ -113,7 +113,7 @@ class TestMemoraAdapter:
         with patch("dumemeval.verifier.LLMJudgeVerifier.verify") as mock_verify:
             # LLM judge 恒判 yes：presence 对、forgetting 错 → MPA=1 FAA=0 → FAMA=0.5
             mock_verify.return_value = Verdict(label="yes", score=1.0, reason="ok")
-            metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+            metrics = a.evaluate(task, outputs)
         assert mock_verify.call_count == 2  # 2 个子题各调一次
         assert metrics["fama"] == pytest.approx(50.0)
 
@@ -143,6 +143,6 @@ class TestMemoraEmptyOutput:
         task = a.build_tasks(data)[0]
         outputs = [AgentOutput(query=task.data["questions"][0]["question"], output="")]
         with patch("dumemeval.verifier.LLMJudgeVerifier.verify") as mock_verify:
-            metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+            metrics = a.evaluate(task, outputs)
         assert mock_verify.call_count == 0
         assert metrics["fama"] == pytest.approx(0.0)

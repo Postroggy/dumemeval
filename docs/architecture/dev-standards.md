@@ -1,6 +1,6 @@
 # 开发规范
 
-本文是**工程规范的唯一权威来源**。`CLAUDE.md`（AI agent 用）与 `CONTRIBUTING.md` 引用此处，不重复维护。
+本文是**工程规范的唯一权威来源**。`CLAUDE.md`（AI agent 用；`AGENTS.md` 是它的符号链接）与 `CONTRIBUTING.md` 引用此处，不重复维护。
 
 ## 1. 数据模型
 
@@ -12,7 +12,7 @@
 
 - 函数签名完整注解（参数 + 返回值）
 - 禁止 `Any` 滥用——能用 `Literal` / `Enum` / 具体模型就不用
-- `mypy --strict` 覆盖 **src 和 tests**（统一口径：仓库根目录裸跑 `mypy`，读 pyproject 的 `files` 配置）；CI、Makefile 与本地必须同一口径
+- `mypy --strict` 覆盖 **src 和 tests**（统一口径：仓库根目录裸跑 `mypy`，读 pyproject 的 `files` 配置）；本地与 GitHub 都只跑 `make ci`
 
 ## 3. 代码质量
 
@@ -44,9 +44,8 @@
 - 发布检查单：
   1. `CHANGELOG.md` Unreleased 段整理完整
   2. bump `pyproject.toml` version
-  3. `make test && make lint` 全绿
-  4. `make example` 跑通（存在性证明）
-  5. commit + tag `v<version>` + GitHub Release（正文用 CHANGELOG 该段）
+  3. `make ci` 全绿（含 example / mock smoke）
+  4. commit + tag `v<version>` + GitHub Release（正文用 CHANGELOG 该段）
 
 ## 7. 文档
 

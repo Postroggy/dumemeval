@@ -5,7 +5,7 @@ smoke 子集本身随仓库捆绑在 ``data/smoke/``（零下载），本命令�
 完整数据的真跑（configs/backends/）与重新生成捆绑子集用。
 
 用法：
-    dumemeval prepare                  # locomo + shopping
+    dumemeval prepare                  # 注册表里所有可下载数据集
     dumemeval prepare --dataset locomo
     dumemeval prepare --dataset shopping --force   # 强制重新下载
     dumemeval prepare --root /path     # 覆盖缓存根（默认 ~/.cache/dumemeval/datasets）
@@ -21,7 +21,7 @@ from ..datasets import prepare as prep
 
 def cmd_prepare(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser() if args.root else None
-    datasets = tuple(prep.dataset_names()) if args.dataset == "all" else (args.dataset,)
+    datasets = tuple(prep.downloadable_names()) if args.dataset == "all" else (args.dataset,)
 
     print(f"📦 缓存根: {root or prep.cache_root()}\n")
     for name in datasets:
@@ -36,12 +36,10 @@ def cmd_prepare(args: argparse.Namespace) -> int:
         print(f"      full  → {paths['full']}")
         if smoke is not None and smoke.exists():
             print(f"      smoke → {smoke}")
-        if name in ("shopping", "bundled_shopping"):
-            print(
-                "      ⚠️  这只是任务文件（目标 ASIN）。官方 webshop 商品库与 env server\n"
-                "        需另按 MemoryArena setup_web_shopping.md 启动（默认 :8005），\n"
-                "        否则 shopping 官方 ASIN 分恒为 0——这是环境缺口，不是模型分数。"
-            )
+        spec = prep.DATASET_REGISTRY.get(prep.canonical_dataset_name(name))
+        if spec is not None and spec.prepare_note:
+            # shopping 任务文件 ≠ webshop 商品库；官方 ASIN 分依赖 env server。
+            print("      ⚠️  " + spec.prepare_note.replace("\n", "\n        "))
 
     print(
         "\n下一步：\n"

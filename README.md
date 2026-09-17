@@ -209,14 +209,9 @@ dumemeval compare runs/everos runs/mem0 runs/base --output runs/cmp
 ## 开发
 
 ```bash
-# 测试（不含 e2e）
-make test
-# 或：.venv/bin/python -m pytest tests/ -m "not e2e"
-
-# lint + 类型检查（严格模式，CI 同口径）
-.venv/bin/ruff check src/dumemeval tests
-.venv/bin/ruff format --check src/dumemeval tests
-.venv/bin/mypy
+# 与 GitHub Actions 同口径（lint + test + build + mock smoke）
+make ci
+# 单项：make lint / make test / make example / make smoke-mock
 ```
 
 ## Harbor 端到端注意事项

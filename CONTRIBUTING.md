@@ -26,7 +26,7 @@
 
 1. fork 仓库并 clone；没有 fork 权限就先开 Issue。
 2. 从最新的 `master` 切分支：`git checkout -b feat/<short-name>`。
-3. 写设计文档，再实现和测试。本地过 `make lint` 和 `make test`。
+3. 写设计文档，再实现和测试。本地过 `make ci`（与 GitHub Actions 同口径）。
 4. commit 信息带前缀：`feat:` / `fix:` / `docs:` / `refactor:` / `test:`。
 5. push 后开 PR。描述里贴设计文档链接和测试摘要。
 6. 按 review 改完再 push，不用重开 PR。
@@ -39,18 +39,16 @@
 
 ```bash
 make install      # 含 pre-commit install（格式门禁自动生效）
-make doctor       # mock 项全绿即可提 PR
 make example      # 自带迷你数据集，验证装完能跑
-make test
-make lint
-make coverage     # 覆盖率报告
+make ci           # 与 GitHub Actions 同口径（lint + test + build + mock smoke）
+make coverage     # 覆盖率报告（不进 CI 门禁）
 ```
 
 仅支持 Python 3.12+（Harbor 的要求）。
 
 发布维护者看 dev-standards.md 的「版本与发布」检查单（SemVer 精神，1.0 前次版本可含破坏性变更，须有 CHANGELOG 迁移说明）。
 
-工程硬规范（数据模型 / 类型注解 / 测试 / 依赖 / 版本发布）统一见 [docs/architecture/dev-standards.md](docs/architecture/dev-standards.md)——与 `CLAUDE.md` 同源，一处维护。
+工程硬规范（数据模型 / 类型注解 / 测试 / 依赖 / 版本发布）统一见 [docs/architecture/dev-standards.md](docs/architecture/dev-standards.md)——与 `CLAUDE.md`（`AGENTS.md` 是它的符号链接）同源，一处维护。
 
 ## 加一个 Memory 后端
 
@@ -98,8 +96,7 @@ make coverage     # 覆盖率报告
 - [ ] 新公共类型是 pydantic `BaseModel`
 - [ ] 数据集 PR：docstring 有 `Source:` URL，`docs/datasets/` 已更新
 - [ ] 任务环境 PR：`register_task_environment` 已注册，docstring 说明协议 / 动作空间
-- [ ] 测试覆盖新路径；`pytest -m "not e2e"` 绿
-- [ ] ruff + mypy 绿（mypy 覆盖 src + tests，统一口径）
+- [ ] `make ci` 绿（与 GitHub Actions 同口径：ruff + mypy + pytest + build + mock smoke）
 - [ ] 若改指标语义，在 GOVERNANCE「勿过度解读」补一句
 
 ## 提问

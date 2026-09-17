@@ -33,7 +33,7 @@ hermes_builtin / directory）在 `configs/backends/` 用完整数据。
 ## 怎么跑
 
 ```bash
-# 编排（无 Docker / 无密钥；数据零下载）
+# 编排（无 Docker / 无密钥；数据零下载）。`make ci` 含这一步
 make smoke-mock
 
 # 真跑（需 Harbor extra + Docker + ANTHROPIC_*；runtime 用 claude-code，需 dumeval-claude-code:latest）

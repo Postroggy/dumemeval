@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import dumemeval.datasets.benchmarks  # noqa: F401
 from dumemeval.datasets import get_benchmark
 from dumemeval.datasets.benchmarks.halumem import HaluMemData
-from dumemeval.models import AgentOutput, EvalResult
+from dumemeval.models import AgentOutput
 
 RAW = [
     {
@@ -75,7 +75,7 @@ class TestHaluMemAdapter:
         task = a.build_tasks(HaluMemData.from_raw(RAW))[0]
         qas = task.data["qa"]
         outputs = [AgentOutput(query=qas[0]["question"], output="a new car")]
-        metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+        metrics = a.evaluate(task, outputs)
         # 评测层未传 memory_files → 空记忆库 → 官方规则 integrity 记 0
         assert metrics["integrity_recall_all"] == pytest.approx(0.0)
         assert metrics["update_correct_ratio"] == pytest.approx(1.0)
@@ -92,7 +92,6 @@ class TestHaluMemAdapter:
         outputs = [AgentOutput(query=qas[0]["question"], output="a new car")]
         bundle = HaluMemCalculator(judge=lambda pred, gold, q: True).calculate(
             MetricInput(
-                result=EvalResult(task_name=task.name, memory_backend="m"),
                 task=task,
                 outputs=outputs,
                 memory_files={"MEMORY.md": "User bought a new car"},
@@ -128,7 +127,6 @@ class TestHaluMemAdapter:
             ]
             bundle = HaluMemCalculator().calculate(
                 MetricInput(
-                    result=EvalResult(task_name=task.name, memory_backend="m"),
                     task=task,
                     outputs=outputs,
                     memory_files={"MEMORY.md": "User bought a new car"},
@@ -151,7 +149,7 @@ class TestHaluMemAdapter:
         task = a.build_tasks(HaluMemData.from_raw(RAW))[0]
         qas = task.data["qa"]
         outputs = [AgentOutput(query=qas[0]["question"], output="a red car")]
-        metrics = a.evaluate(EvalResult(task_name=task.name, memory_backend="m"), task, outputs)
+        metrics = a.evaluate(task, outputs)
         assert metrics["integrity_recall_all"] == pytest.approx(0.0)
         assert metrics["interference_accuracy"] == pytest.approx(1.0)  # 反向计分
         assert metrics["qa_hallucination_ratio"] == pytest.approx(1.0)

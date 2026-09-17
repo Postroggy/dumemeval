@@ -12,17 +12,12 @@ import dumemeval.datasets.benchmarks  # noqa: F401
 from dumemeval.datasets import get_benchmark
 from dumemeval.datasets.benchmarks.memoryarena_reasoning import MemoryArenaMathAdapter, MemoryArenaPhysAdapter
 from dumemeval.datasets.benchmarks.memoryarena_search import MemoryArenaSearchAdapter
-from dumemeval.metrics import get_benchmark_calculator, outputs_from_result
+from dumemeval.metrics import get_benchmark_calculator, outputs_from_execution
 from dumemeval.metrics.benchmarks.streammembench import token_overlap_score
 from dumemeval.metrics.core.base import MetricInput
-from dumemeval.models import AgentOutput, EvalResult, EvalTask
+from dumemeval.models import AgentOutput, EvalTask, SessionOutcome, TaskExecution
 from dumemeval.verifier.base import Verdict
 from dumemeval.verifier.parsers import parse_judge_response
-
-
-def _result(name: str = "t") -> EvalResult:
-    return EvalResult(task_name=name, memory_backend="m")
-
 
 SHOPPING_RAW = [
     {
@@ -133,7 +128,7 @@ class TestMemoryArenaShopping:
             AgentOutput(query="Buy almond flour B00TUDFEW2", output="Purchased B00TUDFEW2 Almond Flour"),
             AgentOutput(query="Buy muffin pan B08957C9ZH", output="Purchased B08957C9ZH Muffin Pan"),
         ]
-        metrics = a.evaluate(_result(task.name), task, outputs)
+        metrics = a.evaluate(task, outputs)
         assert metrics["match_ground_truth"] == 1.0
         assert metrics["overall_success"] == 1.0
         assert metrics["attribute_match"] == 1.0
@@ -147,7 +142,7 @@ class TestMemoryArenaShopping:
             AgentOutput(query="Buy almond flour B00TUDFEW2", output="B00TUDFEW2 Almond Flour"),
             AgentOutput(query="Buy muffin pan B08957C9ZH", output="bought something else"),
         ]
-        metrics = a.evaluate(_result(task.name), task, outputs)
+        metrics = a.evaluate(task, outputs)
         assert metrics["match_ground_truth"] == pytest.approx(0.5)
         assert metrics["overall_success"] == 0.0
 
@@ -166,7 +161,7 @@ class TestMemoryArenaSearch:
         ]
         with patch("dumemeval.verifier.LLMJudgeVerifier.verify") as mock_verify:
             mock_verify.return_value = Verdict(label="yes", score=1.0, reason="matches")
-            metrics = a.evaluate(_result(task.name), task, outputs)
+            metrics = a.evaluate(task, outputs)
         assert mock_verify.call_count == 2
         assert metrics["accuracy"] == 1.0
         assert "f1" not in metrics.values
@@ -179,7 +174,7 @@ class TestMemoryArenaSearch:
         task = a.build_tasks(a.data_type.from_raw(SEARCH_RAW))[0]
         outputs: list[AgentOutput] = []
         with patch("dumemeval.verifier.LLMJudgeVerifier.verify") as mock_verify:
-            metrics = a.evaluate(_result(task.name), task, outputs)
+            metrics = a.evaluate(task, outputs)
         assert mock_verify.call_count == 0
         assert metrics["accuracy"] == 0.0
 
@@ -190,7 +185,7 @@ class TestMemoryArenaSearch:
             AgentOutput(query="Who started via an audition?", output="Sonia Uche started via an audition."),
             AgentOutput(query="Where did they work next?", output="unrelated"),
         ]
-        metrics = a.evaluate(_result(task.name), task, outputs)
+        metrics = a.evaluate(task, outputs)
         assert metrics["accuracy"] == pytest.approx(0.5)
 
     def test_parse_judge_response(self) -> None:
@@ -220,7 +215,7 @@ class TestMemoryArenaReasoning:
         ]
         with patch("dumemeval.verifier.LLMJudgeVerifier.verify") as mock_verify:
             mock_verify.return_value = Verdict(label="yes", score=1.0, reason="equivalent")
-            metrics = a.evaluate(_result(task.name), task, outputs)
+            metrics = a.evaluate(task, outputs)
         assert mock_verify.call_count == 2
         assert metrics["is_correct"] == 1.0
         assert "round_success" not in metrics.values
@@ -235,8 +230,8 @@ class TestMemoryArenaReasoning:
             AgentOutput(query=r"Find $\nu(p)$.", output=r"$\nu(p)=\overline{ev}_p$"),
             AgentOutput(query=r"Compute $(c_2,c_3)$.", output="wrong"),
         ]
-        assert math_a.evaluate(_result(), math_task, outputs)["is_correct"] == pytest.approx(0.5)
-        assert phys_a.evaluate(_result(), phys_task, outputs)["is_correct"] == pytest.approx(0.5)
+        assert math_a.evaluate(math_task, outputs)["is_correct"] == pytest.approx(0.5)
+        assert phys_a.evaluate(phys_task, outputs)["is_correct"] == pytest.approx(0.5)
         assert math_a.name == "memoryarena_math"
         assert phys_a.name == "memoryarena_phys"
 
@@ -264,7 +259,7 @@ class TestStreamMemBench:
             AgentOutput(query=initial, output=PASSING_STREAM_ANSWER),
             AgentOutput(query=followup, output=PASSING_FOLLOWUP),
         ]
-        metrics = a.evaluate(_result(task.name), task, outputs)
+        metrics = a.evaluate(task, outputs)
         assert set(a.metrics()) == {
             "fidelity",
             "initial_evidence_use",
@@ -281,7 +276,6 @@ class TestStreamMemBench:
         calc = get_benchmark_calculator("streammembench")
         with_mem = calc.calculate(
             MetricInput(
-                result=_result(task.name),
                 task=task,
                 outputs=outputs,
                 memory_files={"mem.md": evidence},
@@ -300,7 +294,7 @@ class TestStreamMemBench:
             AgentOutput(query=followup, output="不知道"),
             AgentOutput(query=f"revise::{initial}", output=PASSING_STREAM_ANSWER),
         ]
-        metrics = a.evaluate(_result(task.name), task, outputs)
+        metrics = a.evaluate(task, outputs)
         assert metrics["initial_evidence_use"] == 0.0
         assert metrics["feedback_incorporation_applicable"] == 1.0
         assert metrics["feedback_incorporation"] == 1.0
@@ -310,55 +304,47 @@ class TestStreamMemBench:
         assert token_overlap_score("Jake 电脑 硬盘", "Jake") < 0.5
 
 
-class TestOutputsFromResult:
+def _execution(*sessions: SessionOutcome, name: str = "t") -> TaskExecution:
+    return TaskExecution(task_id=name, task_name=name, memory_backend="m", sessions=list(sessions))
+
+
+class TestOutputsFromExecution:
     def test_qa_uses_last_session(self) -> None:
         task = EvalTask(name="t", data={"qa": [{"question": "drink?", "answer": "latte"}]})
-        result = EvalResult(
-            task_name="t",
-            memory_backend="m",
-            session_outcomes=[
-                {"session_id": 1, "observation": "ingest"},
-                {"session_id": 2, "observation": "latte please"},
-            ],
+        execution = _execution(
+            SessionOutcome(session_id=1, observation="ingest"),
+            SessionOutcome(session_id=2, observation="latte please"),
         )
-        outs = outputs_from_result(task, result)
+        outs = outputs_from_execution(task, execution)
         assert len(outs) == 1
         assert outs[0].output == "latte please"
 
     def test_string_questions_skip_ingest(self) -> None:
-        """无 query 映射时的兼容路径（session 数刚好 == question 数才对齐）。"""
+        """无 query 映射时按位置对齐（session 数刚好 == question 数才准确）。"""
         task = EvalTask(
             name="t",
             data={"questions": ["q1", "q2"]},
         )
-        result = EvalResult(
-            task_name="t",
-            memory_backend="m",
-            session_outcomes=[
-                {"session_id": 1, "observation": "ingest"},
-                {"session_id": 2, "observation": "ans1"},
-                {"session_id": 3, "observation": "ans2"},
-            ],
+        execution = _execution(
+            SessionOutcome(session_id=1, observation="ingest"),
+            SessionOutcome(session_id=2, observation="ans1"),
+            SessionOutcome(session_id=3, observation="ans2"),
         )
-        outs = outputs_from_result(task, result)
+        outs = outputs_from_execution(task, execution)
         assert [o.query for o in outs] == ["q1", "q2"]
         assert [o.output for o in outs] == ["ans1", "ans2"]
 
     def test_exact_query_match_ignores_position(self) -> None:
-        """一旦 session_outcomes 带 query（SessionRunner 从 SessionSpec.query 回填），
+        """一旦 SessionOutcome.query 有值（SessionRunner 从 SessionSpec.query 回填），
         对齐走精确匹配，不再依赖"最后 N 个 session"的位置假设。"""
         task = EvalTask(name="t", data={"questions": ["q1", "q2"]})
-        result = EvalResult(
-            task_name="t",
-            memory_backend="m",
+        execution = _execution(
             # 顺序打乱 + 中间夹一个非问答 session，位置切片会算错
-            session_outcomes=[
-                {"session_id": 1, "observation": "ans2", "query": "q2"},
-                {"session_id": 2, "observation": "ingest, no query"},
-                {"session_id": 3, "observation": "ans1", "query": "q1"},
-            ],
+            SessionOutcome(session_id=1, observation="ans2", query="q2"),
+            SessionOutcome(session_id=2, observation="ingest, no query"),
+            SessionOutcome(session_id=3, observation="ans1", query="q1"),
         )
-        outs = outputs_from_result(task, result)
+        outs = outputs_from_execution(task, execution)
         by_query = {o.query: o.output for o in outs}
         assert by_query == {"q1": "ans1", "q2": "ans2"}
 
@@ -379,16 +365,13 @@ class TestOutputsFromResult:
         ]
         task = a.build_tasks(a.data_type.from_raw(travel_data))[0]
         assert len(task.sessions) == 3  # 1 注入 + 2 问答，session 数 != question 数（2）
-        result = EvalResult(
-            task_name=task.name,
-            memory_backend="m",
-            session_outcomes=[
-                {"session_id": 1, "observation": "记住了偏好", "query": task.sessions[0].query},
-                {"session_id": 2, "observation": "Flight F1", "query": task.sessions[1].query},
-                {"session_id": 3, "observation": "Flight F2", "query": task.sessions[2].query},
-            ],
+        execution = _execution(
+            SessionOutcome(session_id=1, observation="记住了偏好", query=task.sessions[0].query),
+            SessionOutcome(session_id=2, observation="Flight F1", query=task.sessions[1].query),
+            SessionOutcome(session_id=3, observation="Flight F2", query=task.sessions[2].query),
+            name=task.name,
         )
-        outs = outputs_from_result(task, result)
+        outs = outputs_from_execution(task, execution)
         by_query = {o.query: o.output for o in outs}
         assert by_query == {"Plan day 1.": "Flight F1", "Plan day 2.": "Flight F2"}
 

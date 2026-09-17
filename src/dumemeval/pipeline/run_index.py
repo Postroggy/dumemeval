@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +26,7 @@ def write_run_index(
     experiment_name: str,
     generated_at: str,
     tasks: list[EvalTask],
-    results: list[TaskResult],
+    results: Sequence[TaskResult],
 ) -> Path:
     """生成并落盘 ``index.json``，返回其路径。"""
     out = Path(output_dir)
