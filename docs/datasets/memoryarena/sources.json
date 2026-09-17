@@ -29,7 +29,7 @@
     "env/env_systems/web_search_env/evaluate_with_openai.py": "16cefdd5a5efd4422167d7dc44cafbd7041fda2df5b387ddea2f57134d0de403",
     "env/env_systems/formal_reasoning_env/eval.py": "7610922a139539c697ff0b074b57eb279e9339f81acced2203e3812b794ef13b"
   },
-  "evidence_scope": "Source and asset provenance; actual integration evidence is in memoryarena-acceptance-verification.json",
+  "evidence_scope": "Source and asset provenance; integration results and archive hashes are in acceptance.md and verification.json",
   "integration_verification_date": "2026-09-15",
   "external_assets": {
     "ai-hyz/MemoryArena-product-db": {

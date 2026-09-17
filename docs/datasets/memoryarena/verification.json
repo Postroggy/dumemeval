@@ -1,0 +1,115 @@
+{
+  "issue": "https://github.com/Postroggy/dumemeval/issues/4",
+  "documentation_consolidation_date": "2026-09-17",
+  "implementation_commit": "f3fdd925842dc98dda667a6ee28a06b0ac656ac8",
+  "upstream_commit": "37a0e1959e14509898fca856d8fd3fd2a720aefb",
+  "historical_hermes_run_commit": "909e185d043d04db1b5c21df1b610eef52fa0c1c",
+  "recorded_checks": {
+    "date": "2026-09-16",
+    "platform": "Windows / Python 3.12.11",
+    "full_non_e2e": {
+      "passed": 632,
+      "failed": 108,
+      "skipped": 13
+    },
+    "upstream_non_e2e": {
+      "passed": 389,
+      "failed": 109,
+      "skipped": 13
+    },
+    "related_passed": 232,
+    "official_parity_passed_in_related": 33,
+    "mypy_errors": 152,
+    "upstream_mypy_errors": 173,
+    "new_failed_test_identities_from_upstream": [],
+    "new_mypy_diagnostics_from_upstream": [],
+    "ruff": "passed",
+    "format": "229 files passed",
+    "wheel_and_sdist": "passed",
+    "installed_source_modules_verified": 154,
+    "isolated_import_and_registry_checks": 8,
+    "installed_official_math_worker_lifecycle": "passed",
+    "evidence": "evidence/checks.zip: f3fdd92/ and baseline/"
+  },
+  "real_runs": {
+    "sample": "Math row 39, paper 2507.18621, two questions",
+    "sample_sha256": "82a430425b49471c68a8fc8a00caffe4fd505678fb8001f785abd565a5c3b868",
+    "claude_code": {
+      "version": "2.1.89",
+      "on_sessions": 2,
+      "off_sessions": 2,
+      "on_passrate": 1.0,
+      "off_passrate": 1.0
+    },
+    "hermes": {
+      "version": "0.21.3",
+      "on_sessions": 2,
+      "off_sessions": 2,
+      "on_passrate": 1.0,
+      "off_passrate": 1.0
+    },
+    "hermes_controls_rechecked": {
+      "actual_user_prompts_equal_per_session": true,
+      "native_system_prompts_equal": true,
+      "observed_skill_view_results_equal": true,
+      "recorded_control_fingerprints_equal": 9,
+      "distinct_native_sessions": 4,
+      "all_native_parent_sessions_null": true,
+      "second_session_read_matches_first_snapshot": true,
+      "memory_updated_in_second_session": true,
+      "method": "Read original native traces and prompts; remove read_file line-number display prefixes when matching snapshots."
+    },
+    "automatic_legacy_comparison": "unverified: agent_skills and observed_prompts missing; original reports unchanged"
+  },
+  "limits": [
+    "Recorded full-suite, mypy, build and model results were not rerun during documentation consolidation.",
+    "Real model traces precede subsequent fixes; current implementation has separate regression/parity evidence.",
+    "No five-scene full-dataset run or claim of positive memory gain.",
+    "Shopping wall-clock initialization is uncontrolled; full-catalog evaluation is unmeasured.",
+    "Native Linux host routing and a new account interactive login were not validated.",
+    "Hermes framework token/cost zero is unmeasured; native token counters are retained separately."
+  ],
+  "archives": {
+    "evidence/claude-and-tools.zip": {
+      "sha256": "46937f2cb9dbaf731b17a3ef726caede54f125ad6468a4d4e7425495ed61fad3",
+      "bytes": 269582,
+      "members": 113
+    },
+    "evidence/hermes.zip": {
+      "sha256": "edbd423d38963fefd4dde2862ee9f68be98b3a1dd549f564c216deff6b4fae60",
+      "bytes": 336679,
+      "members": 175
+    },
+    "evidence/checks.zip": {
+      "sha256": "fe97fd79799d073259eee2b8334032e7d98f96cc57d13b373882361cefeadaf1",
+      "bytes": 114679,
+      "members": 35
+    }
+  },
+  "documentation_checks": {
+    "documentation_files_before": 29,
+    "documentation_files_after": 8,
+    "main_markdown_files": 3,
+    "changed_markdown_files_checked": 8,
+    "local_links_and_anchors_checked": 41,
+    "broken_links": [],
+    "powershell_blocks_parsed": 12,
+    "powershell_syntax_errors": [],
+    "zip_members_crc_checked": 323,
+    "archived_json_and_jsonl_files_parsed": 198,
+    "original_real_run_archives_byte_identical": true,
+    "retained_check_members_byte_identical": true,
+    "upstream_failure_and_mypy_comparison": "no new identities or diagnostics",
+    "hermes_raw_control_and_cross_session_memory_recheck": "passed",
+    "production_source_and_dependency_files_unchanged": true,
+    "changed_test": "tests/benchmarks/memoryarena/test_historical_controls.py: archive path only",
+    "pytest": {
+      "passed": 10,
+      "failed": 0,
+      "command": "python -m pytest tests/benchmarks/memoryarena/test_historical_controls.py tests/test_control_completeness.py -q -o addopts= --tb=short"
+    },
+    "ruff_changed_test": "passed",
+    "format_changed_test": "passed",
+    "model_calls": 0
+  }
+}

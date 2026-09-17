@@ -68,7 +68,7 @@ make coverage     # 覆盖率报告（不进 CI 门禁）
 3. 用 `@register_benchmark` 注册 adapter；在 `datasets/benchmarks/__init__.py` 导入模块或集成包，沿用已有初始化方式。包导入不应启动服务或加载可选模型 SDK。
 4. 在数据集自己的 `metrics/` 实现 `MetricCalculator`，`kind = "benchmark"`；docstring 写官方实现的文件名 + 关键函数，官方代码未公开时标注「自定义，非官方镜像」。
 5. 用 `register_calculator(Cls, *aliases)` 注册计算器和别名；简单计算器继续在 `metrics/__init__.py` 注册，集成包可在自己的 `metrics/__init__.py` 注册，由 `metrics/benchmarks/__init__.py` 导入。无需修改通用注册表的查询函数。
-6. 测试与 fixture 放在 `tests/benchmarks/<name>/`，设计与验收材料放在 `docs/datasets/<name>/`，并更新[数据集索引](docs/datasets/README.md)。目录和兼容例子见 [MemoryArena](docs/datasets/memoryarena/layout.md)，注册方式见[原框架复用](docs/datasets/memoryarena/framework-reuse.md)。
+6. 测试与 fixture 放在 `tests/benchmarks/<name>/`，设计与验收材料放在 `docs/datasets/<name>/`，并更新[数据集索引](docs/datasets/README.md)。目录和兼容例子见 [MemoryArena](docs/datasets/memoryarena/README.md#compatibility)，注册方式见[原框架复用](docs/datasets/memoryarena/README.md#architecture)。
 7. **禁止**新增 `scripts/<bench>/*_ingestion.py` 六段流水线。
 
 口径测试用固定 fixture，不要打真实 LLM。

@@ -124,12 +124,8 @@ rg -n "^Source:|^Paper:" src/dumemeval/datasets/benchmarks/*.py
 | `evermembench_dynamic` | MC 规则判分 + OE LLM judge | 官方 `_parse_mc_answer` |
 | `perltqa` | EM + token F1 | ⚠️ 官方评测代码未发布，适配层自定义 |
 
-MemoryArena 另有 [Hermes 真实 on/off 与记忆通道验证](memoryarena/hermes.md)，
-含固定版本复现入口、原生轨迹与脱敏证据包。
-Shopping 逐商品边界、实际提示/技能指纹和 Search 多次判分的当前修复见
-[PR #5 审查反例与回归](memoryarena/review-fixes.md)。
-旧报告缺少必需控制指纹时的校验与 Hermes 归档回归见
-[控制指纹完整性修复](memoryarena/control-completeness.md)。
+MemoryArena 的[接入设计](memoryarena/README.md)、[运行指南](memoryarena/clean-setup.md)和
+[Issue #4 验收报告](memoryarena/acceptance.md)覆盖五场景、官方对照、真实 on/off、原始证据及已知限制。
 
 ## 未完成
 

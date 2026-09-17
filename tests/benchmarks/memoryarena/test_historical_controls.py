@@ -12,7 +12,7 @@ from dumemeval.comparison.report import write_comparison
 
 @pytest.mark.parametrize("scene", ["math", "diagnostic"])
 def test_committed_hermes_reports_warn_without_changing_scores(tmp_path: Path, scene: str) -> None:
-    archive = Path(__file__).resolve().parents[3] / "docs/datasets/memoryarena/hermes-evidence.zip"
+    archive = Path(__file__).resolve().parents[3] / "docs/datasets/memoryarena/evidence/hermes.zip"
     with zipfile.ZipFile(archive) as bundle:
         for arm in ["on", "off"]:
             directory = tmp_path / arm

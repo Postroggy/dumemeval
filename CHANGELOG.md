@@ -13,8 +13,8 @@
 
 - **MemoryArena 按数据集族归档**：实现集中到 `dumemeval.benchmarks.memoryarena`，测试与验收材料分别进入 `tests/benchmarks/memoryarena/`、`docs/datasets/memoryarena/`。配置和 CLI 名称保持兼容，顶层计算器及 Webshop provider 导出保留。
   内部导入路径迁移：`datasets.benchmarks.memoryarena_<scene>` → `benchmarks.memoryarena.datasets.<scene>`；`metrics.benchmarks.memoryarena*` → `benchmarks.memoryarena.metrics.*`（原 `memoryarena.py` 为 `travel.py`）；受管环境实现 → `benchmarks.memoryarena.environment.*`（HTTP 客户端为 `client.py`，Arena 配置为 `config.py`）。`task_environments.prepare.prepare_environment` 继续作为通用入口。
-  运行时控制字段使用 `EnvironmentControls`；旧产物缺少该字段时标为未验证。历史 JSON/ZIP 保持原始字节，其路径和哈希对应原提交。详见[目录与扩展边界](docs/datasets/memoryarena/layout.md)。
-  数据、指标和环境沿用原有 `register_*` 与包初始化方式，移除通用注册表中的 MemoryArena 专用加载函数；见[原框架复用](docs/datasets/memoryarena/framework-reuse.md)。
+  运行时控制字段使用 `EnvironmentControls`；旧产物缺少该字段时标为未验证。保留的原始运行 ZIP 和检查记录保持字节不变，其路径和哈希对应原提交。详见[目录与扩展边界](docs/datasets/memoryarena/README.md#compatibility)。
+  数据、指标和环境沿用原有 `register_*` 与包初始化方式，移除通用注册表中的 MemoryArena 专用加载函数；见[原框架复用](docs/datasets/memoryarena/README.md#architecture)。
 
 ### Fixed
 - **MemoryAgentBench ingest 粒度**：不再把整段 `context` 塞进一个 session。按官方

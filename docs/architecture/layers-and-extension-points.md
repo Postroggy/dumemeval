@@ -66,7 +66,7 @@ flowchart BT
 | 指标口径 | `MetricCalculator` | `register_calculator` | `docs/metrics/` |
 | 任务环境 | `TaskEnvironmentProvider` | `register_task_environment` | `docs/execution/task-environment-layer.md` |
 
-多场景数据集族集中到 `src/dumemeval/benchmarks/<name>/`，内部仍按数据、指标、环境的职责分层，分别接入现有注册表；公共协议留在原通用层。测试和验收材料也按数据集归档，参见 [MemoryArena 目录设计](../datasets/memoryarena/layout.md)。
+多场景数据集族集中到 `src/dumemeval/benchmarks/<name>/`，内部仍按数据、指标、环境的职责分层，分别接入现有注册表；公共协议留在原通用层。测试和验收材料也按数据集归档，参见 [MemoryArena 目录设计](../datasets/memoryarena/README.md#architecture)。
 
 任务环境既可暴露外部 endpoint（`http` / `webshop`），也可提供受管运行时（`memoryarena`）。准备通过 provider 的 `prepare` 调用；稳定控制输入由 `EnvironmentControls` 提供给报告。行动打分仍走指标层，环境资源与记忆分别管理。
 
