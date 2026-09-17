@@ -10,7 +10,9 @@
 | `controlled-math.yaml` | Claude Code 的完整两轮 Math on/off，相同提示与镜像内共用 Skill。 |
 | `controlled-math-hermes.yaml` | 相同 Math 样本的 Hermes 对照；通过 `hermes_repro.py` 处理指定 Harbor 版本的兼容。 |
 | `hermes-memory-link.yaml` | 可选随机标记记忆通道诊断，非官方样本/分数。 |
-| `cliproxyapi-smoke.yaml` / `cliproxyapi-memory-smoke.yaml` | 早期模型通信/合成持久化诊断，正式验收使用完整样本的 controlled 配置。 |
+
+早期本机代理通信与合成持久化调试配置已移出交付目录；正式复现使用上表的场景与对照配置。
+历史运行所用代理的版本和启动方式保留在运行指南与原始证据中，用于复核当时的实验环境。
 
 通用场景模板需导出 `MEMORYARENA_AGENT_MODEL`、`MEMORYARENA_JUDGE_MODEL`、`ANTHROPIC_AUTH_TOKEN`、
 `ANTHROPIC_BASE_URL`；外部资源与 worker 的变量按运行指南设置。
