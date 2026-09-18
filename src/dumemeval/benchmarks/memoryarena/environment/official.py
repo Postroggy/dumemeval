@@ -73,14 +73,12 @@ def main() -> None:
     catalog = OfficialTools(reference, config.tools_config, config.scene_families)
     app: FastAPI = official.app
 
-    @app.post("/env/tools")
     def tools(request: ToolRequest) -> dict[str, Any]:
         entry = official.ENVIRONMENTS.get(request.task_id)
         if entry is None:
             raise HTTPException(404, "Environment not initialized")
         return {"status": "ok", "task_id": request.task_id, "tools": catalog.prepare(entry["env_name"])}
 
-    @app.post("/env/tool")
     def tool(request: ToolRequest) -> dict[str, Any]:
         entry = official.ENVIRONMENTS.get(request.task_id)
         if entry is None:
@@ -88,7 +86,6 @@ def main() -> None:
         result = catalog.call(entry["env_name"], entry["env"], request.tool, request.arguments)
         return {"status": "ok", "task_id": request.task_id, "result": result}
 
-    @app.post("/env/shopping_task")
     def shopping_task(request: ShoppingTaskRequest) -> dict[str, Any]:
         module = importlib.import_module("env.env_systems.web_shopping_env.runtime.runner.task_files")
         task = module._reconstruct_task_def_from_hf_row(request.row)
@@ -101,6 +98,11 @@ def main() -> None:
         Path(request.output_path).write_text(json.dumps(task), encoding="utf-8")
         return {"status": "ok", "task_id": request.task_id}
 
+    # Explicit registration preserves handler types when the optional FastAPI
+    # package is absent from the host's strict-mypy environment.
+    app.add_api_route("/env/tools", tools, methods=["POST"])
+    app.add_api_route("/env/tool", tool, methods=["POST"])
+    app.add_api_route("/env/shopping_task", shopping_task, methods=["POST"])
     serve(app, control_output, sdk_retry_policy="factory llm_backend SDK clients: max_retries=0")
 
 

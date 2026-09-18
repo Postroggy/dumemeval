@@ -50,7 +50,7 @@ def test_optional_metric_input_does_not_fabricate_scores(name: str) -> None:
     "name,expected",
     [
         ("shopping", ["match_ground_truth", "overall_success"]),
-        ("travel", ["round_success", "slot_accuracy"]),
+        ("travel", ["derived_round_success", "derived_slot_accuracy"]),
         ("search", ["accuracy", "confidence"]),
         ("math", ["is_correct", "avg_progress_score", "overall_average_passrate"]),
         ("phys", ["is_correct", "avg_progress_score", "overall_average_passrate"]),

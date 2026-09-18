@@ -2,7 +2,7 @@
 
 数据来源 MemoryArena group_travel_planner：
 - 每个样本 = base_person（初始记忆）+ 8 个 interdependent questions
-- 指标：官方 slot 相似度（metrics.benchmarks.memoryarena）+ judgement_mode hint/answer
+- 自定义独立会话流程；在线 slot/反馈诊断不等于官方 PS/SPS/SR
 - 适配器只负责 build_tasks；evaluate 委托统一指标层
 
 Source: https://github.com/ZexueHe/MemoryArena · Paper: https://arxiv.org/abs/2602.16313
@@ -155,6 +155,8 @@ class MemoryArenaTravelAdapter(BenchmarkAdapter):
                     "answers": answers,
                     "base_person": base_person,
                     "judgement_mode": self.judgement_mode,
+                    "execution_flow": "custom_independent_sessions",
+                    "official_history_compatible": False,
                 },
                 benchmark="memoryarena_travel",
             )

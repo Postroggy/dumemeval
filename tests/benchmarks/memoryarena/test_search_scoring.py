@@ -7,6 +7,7 @@ import pytest
 from dumemeval.benchmarks.memoryarena.datasets.search import MemoryArenaSearchAdapter
 from dumemeval.evaluation import CalculatorBenchmarkScorer, Evaluator
 from dumemeval.models import BenchmarkResult, EvalTask, SessionOutcome, TaskExecution
+from dumemeval.models.environment import EnvironmentEvidence
 from dumemeval.pipeline.metrics_run import pool_benchmark
 
 
@@ -23,6 +24,8 @@ def search_task(count: int, max_questions: int | None = None) -> EvalTask:
 def score_search(
     task: EvalTask, flags: list[bool], calls: list[str], failed: bool = False
 ) -> BenchmarkResult:
+    task.task_environment = {"type": "memoryarena"}
+
     def judge(pred: str, gold: str, query: str) -> bool:
         calls.append(query)
         return pred == gold
@@ -36,6 +39,15 @@ def score_search(
                 session_id=i + 1,
                 success=not (failed and i == len(flags) - 1),
                 observation="yes" if flag else "no",
+                environment=EnvironmentEvidence(
+                    task_id=task.name,
+                    env_name="browsecomp-plus",
+                    operation="submit",
+                    tool="submit",
+                    session_id=i + 1,
+                    source="agent_submission",
+                    info={"retrieval_actions": [f"search-{i}"]},
+                ),
             )
             for i, flag in enumerate(flags)
         ],

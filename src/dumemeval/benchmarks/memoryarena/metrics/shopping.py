@@ -5,53 +5,17 @@
 - summary_build.py ``hydrate_step_summary``：本步购买 ASIN 与本步目标匹配；
   ``enrich_task_result`` 的 overall_success 要求每步 match_ground_truth 均为真。
 - webshop_env.py ``_build_judgement``：单步环境购买列表与该步目标列表完全相等。
-- web_shopping_env/compute_reward.py：ASIN 精确匹配时 reward=1.0；
-  否则 ``compute_attribute_matches``（--no-llm 字符串子串，normalize_for_match）
 
 本计算器仅使用 host 采集的 environment evidence；提及 ASIN 不代表购买。
+商品属性与 compute_reward.py 的 fallback reward 未覆盖；没有购买商品属性证据时不计算。
 不把 travel 的 slot / round_success 套到购物任务上。
 """
 
 from __future__ import annotations
 
-import re
 from typing import Any, ClassVar
 
 from dumemeval.metrics.core.base import MetricBundle, MetricCalculator, MetricInput, MetricKind
-
-# Amazon ASIN：样本如 B00TUDFEW2 / B08957C9ZH
-_ASIN_RE = re.compile(r"\b(B0[0-9A-Z]{8})\b", re.IGNORECASE)
-
-
-def normalize_for_match(text: str) -> str:
-    """官方 reward_helpers.normalize_for_match。"""
-    text = text.lower()
-    text = re.sub(r"[-/]", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
-
-
-def compute_attribute_matches(
-    attributes: list[str], purchased_name: str | None
-) -> tuple[int, list[str], list[str]]:
-    """官方 reward_helpers.compute_attribute_matches（字符串路径 / --no-llm）。"""
-    if not attributes:
-        return 0, [], []
-    normalized_name = normalize_for_match(purchased_name or "")
-    matched: list[str] = []
-    missing: list[str] = []
-    for attr in attributes:
-        normalized_attr = normalize_for_match(attr)
-        if normalized_attr and normalized_attr in normalized_name:
-            matched.append(attr)
-        else:
-            missing.append(attr)
-    return len(matched), matched, missing
-
-
-def extract_asins(text: str) -> list[str]:
-    """从 agent 输出抽取 ASIN，顺序保留（对应 purchased_asins 序列）。"""
-    return [match.group(1).upper() for match in _ASIN_RE.finditer(text or "")]
 
 
 def normalize_expected_asins(ground_truth: Any) -> list[str]:
@@ -71,30 +35,6 @@ def normalize_expected_asins(ground_truth: Any) -> list[str]:
     if isinstance(raw, list):
         return [str(item).upper() for item in raw if item]
     return []
-
-
-def score_shopping_round(pred: str, ground_truth: Any) -> dict[str, Any]:
-    """Legacy text diagnostic only; this is not environment-verified shopping scoring."""
-    expected = normalize_expected_asins(ground_truth)
-    attributes: list[str] = []
-    if isinstance(ground_truth, dict):
-        attrs = ground_truth.get("attributes") or []
-        attributes = [str(a) for a in attrs] if isinstance(attrs, list) else []
-    target = expected[0] if expected else ""
-    purchased = extract_asins(pred)
-    exact = bool(expected) and purchased == expected
-    n_matched, matched, missing = compute_attribute_matches(attributes, pred)
-    r_attr = (n_matched / len(attributes)) if attributes else 0.0
-    reward = 1.0 if exact else r_attr
-    return {
-        "match_ground_truth": exact,
-        "target_asin": target,
-        "purchased_asins": purchased,
-        "attribute_match": r_attr,
-        "matched_attributes": matched,
-        "missing_attributes": missing,
-        "reward": reward,
-    }
 
 
 class MemoryArenaShoppingCalculator(MetricCalculator):
@@ -125,6 +65,8 @@ class MemoryArenaShoppingCalculator(MetricCalculator):
                 "execution_status": "completed" if outcome and outcome.success else "not_completed",
                 "score_status": "not_measured",
                 "official_score": None,
+                "attribute_score_status": "not_measured",
+                "attribute_score_reason": "Purchased product attributes are not captured.",
             }
             if evidence and evidence.env_name == "webshop" and outcome and outcome.success and round_expected:
                 purchases = evidence.info.get("purchased_asins")

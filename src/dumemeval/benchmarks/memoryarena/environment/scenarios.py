@@ -14,7 +14,6 @@ from dumemeval.models.memoryarena import SceneFamily, arena_scene
 
 from .client import ArenaClient
 from .config import ArenaRuntimeConfig
-from .service import OfficialService
 
 _JSON: TypeAdapter[JsonValue] = TypeAdapter(JsonValue)
 
@@ -30,10 +29,6 @@ class ArenaScenario(ABC):
 
     def __init__(self, task: EvalTask, config: ArenaRuntimeConfig, directory: Path) -> None:
         self.task, self.config, self.directory = task, config, directory
-
-    def prepare(self, client: ArenaClient) -> None:
-        """Prepare scenario resources before initializing the official environment."""
-        return None
 
     def reset_seed(self) -> int:
         return self.config.seed
@@ -58,8 +53,8 @@ class ArenaScenario(ABC):
     def submit(self, client: ArenaClient, session: SessionSpec, answer: str) -> EnvironmentEvidence:
         """Submit with the host's reference; agents cannot choose their grading inputs."""
 
-    def close(self) -> None:
-        """Release scenario-specific resources after the environment has closed."""
+    def finalize_submission(self, evidence: EnvironmentEvidence, records: list[EnvironmentEvidence]) -> None:
+        """Attach scenario scoring evidence captured by the host in this session."""
         return None
 
     def feedback(self, evidence: EnvironmentEvidence) -> dict[str, JsonValue]:
@@ -116,6 +111,18 @@ class TravelScenario(ArenaScenario):
 
 
 class SearchScenario(ArenaScenario):
+    def finalize_submission(self, evidence: EnvironmentEvidence, records: list[EnvironmentEvidence]) -> None:
+        evidence.info["retrieval_actions"] = [
+            record.action_id
+            for record in records
+            if record.task_id == evidence.task_id
+            and record.session_id == evidence.session_id
+            and record.status == "completed"
+            and record.source == "official_tool"
+            and record.tool in {"search", "get_document"}
+            and record.action_id
+        ]
+
     def submit(self, client: ArenaClient, session: SessionSpec, answer: str) -> EnvironmentEvidence:
         # Upstream step runs its own agent. Its registered search tools are used
         # directly; external-agent answers go to the official grader in evaluation.
@@ -131,13 +138,6 @@ class SearchScenario(ArenaScenario):
 class ShoppingScenario(ArenaScenario):
     seed_policy = "upstream_wall_clock_seed"
     reset_per_session = True
-
-    def __init__(self, task: EvalTask, config: ArenaRuntimeConfig, directory: Path) -> None:
-        super().__init__(task, config, directory)
-        self.upstream = OfficialService(config, directory / "webshop", mode="webshop")
-
-    def prepare(self, client: ArenaClient) -> None:
-        self.upstream.start()
 
     def prepare_session(self, client: ArenaClient, session: SessionSpec) -> None:
         rounds = [item for item in self.task.sessions if item.query is not None]
@@ -159,7 +159,6 @@ class ShoppingScenario(ArenaScenario):
             task_file=str(path),
             reuse_env=False,
             bootstrap_upstream_env=False,
-            upstream_env_server_base=self.upstream.url,
         )
 
     def invoke(self, client: ArenaClient, call: ToolCall) -> ToolResult:
@@ -181,9 +180,6 @@ class ShoppingScenario(ArenaScenario):
         evidence = client.observation()
         evidence.info["episode_scope"] = "session"
         return evidence
-
-    def close(self) -> None:
-        self.upstream.close()
 
 
 SCENARIOS: dict[SceneFamily, type[ArenaScenario]] = {

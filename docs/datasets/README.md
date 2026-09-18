@@ -89,7 +89,7 @@ task:
 核对现有来源：
 
 ```bash
-rg -n "^Source:|^Paper:" src/dumemeval/datasets/benchmarks/*.py
+rg -n "^Source:|^Paper:" src/dumemeval --glob '*.py'
 ```
 
 ## 组织约定
@@ -109,7 +109,7 @@ rg -n "^Source:|^Paper:" src/dumemeval/datasets/benchmarks/*.py
 | `beam` | LLM judge 按 rubric 打分平均 | 官方 `compute_metrics.py` |
 | `clbench` | solving rate（rubrics 全有或全无） | 官方 `eval.py` |
 | `halumem` | 三阶段（integrity recall / interference accuracy / update 分类 / QA 分类） | 官方三阶段 prompt |
-| `memoryarena_travel` | slot 相似度 + `judgement_mode`（hint/answer/none） | 官方 `travel_env.py`；[五场景接入状态](memoryarena/README.md) |
+| `memoryarena_travel` | 派生在线 reward/slot 诊断；PS/SPS/SR 未覆盖 | 官方 `travel_env.py` 在线函数；自定义会话流程，见[五场景接入状态](memoryarena/README.md) |
 | `memoryarena_shopping` | 环境购买 ASIN exact match + 完整 bundle overall_success；缺少环境证据为未测 | 官方 `match_ground_truth`；[接入状态和差异](memoryarena/README.md) |
 | `memoryarena_search` | 最终综合问题的 GRADER_TEMPLATE 判分 → 按 query ID 平均 accuracy；截断为未测 | 官方 `run_search.py`、`search_agent/prompts.py` |
 | `memoryarena_math` / `_phys` | yes/no 数学等价 judge → `is_correct` | 官方 `math_env.judge` |

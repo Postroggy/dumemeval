@@ -101,6 +101,10 @@ class ReportGenerator:
             lines += ["", f"Execution error: {result.execution.error}"]
         if result.benchmark:
             lines += ["", f"## Benchmark ({result.benchmark.benchmark})"]
+            if result.benchmark.score_scope == "derived":
+                lines += ["", "Derived diagnostics only; official score: not measured."]
+            if result.benchmark.coverage_note:
+                lines += ["", result.benchmark.coverage_note]
             if not result.benchmark.values:
                 lines += ["", "Official score: not measured (required evidence is incomplete)."]
             lines += [f"- {k}: {v:.4f}" for k, v in result.benchmark.values.items()]

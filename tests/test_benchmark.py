@@ -188,7 +188,7 @@ class TestMemoryArenaTravel:
         assert "之前的回合信息" in t.sessions[2].instruction
 
     def test_evaluate_metrics(self, travel_data: list[Any]) -> None:
-        """官方 slot 判定：`=== Plan ===` 结构 + transportation 真值 → round_success=1.0。"""
+        """在线 slot 判定：`=== Plan ===` 结构 + transportation 真值 → derived_round_success=1.0。"""
         a = get_benchmark("memoryarena_travel")
         data = a.data_type.from_raw(travel_data)
         task = a.build_tasks(data)[0]
@@ -205,12 +205,12 @@ class TestMemoryArenaTravel:
         metrics = CalculatorBenchmarkScorer("memoryarena_travel").score(
             MetricInput(task=task, outputs=outputs)
         )
-        assert metrics.values["round_success"] == 1.0
+        assert metrics.values["derived_round_success"] == 1.0
         assert metrics.details[0]["judgement_mode"] == "hint"
         assert "Feedback for" in metrics.details[0]["judgement"]
 
     def test_unstructured_output_scores_zero(self, travel_data: list[Any]) -> None:
-        """无官方结构的裸文本 → round_success=0（旧 GT 反向兜底会自证虚高，已删）。"""
+        """无官方结构的裸文本 → derived_round_success=0（旧 GT 反向兜底会自证虚高，已删）。"""
         a = get_benchmark("memoryarena_travel")
         data = a.data_type.from_raw(travel_data)
         task = a.build_tasks(data)[0]
@@ -224,7 +224,7 @@ class TestMemoryArenaTravel:
         metrics = CalculatorBenchmarkScorer("memoryarena_travel").score(
             MetricInput(task=task, outputs=outputs)
         )
-        assert metrics.values["round_success"] == 0.0
+        assert metrics.values["derived_round_success"] == 0.0
 
 
 class TestMemoryArenaShopping:

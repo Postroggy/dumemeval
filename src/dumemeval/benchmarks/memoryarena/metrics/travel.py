@@ -1,4 +1,8 @@
-"""MemoryArena travel 官方指标：slot 相似度 + judgement_mode（hint / answer / none）。
+"""Travel online-reward diagnostics for the custom independent-session flow.
+
+These seven-slot diagnostics are derived metrics, not the official evaluator's
+six-slot, cross-person PS/SPS/SR. Those metrics and the official on/off comparison
+are not measured by this integration.
 
 对齐 vendors/MemoryArena/env/env_systems/travel_env.py：
 - 成功判定：_evaluate_slots（slot 相似度 ≥ 0.7），不是「有输出就算成功」
@@ -112,7 +116,7 @@ def evaluate_slots(model_plan: list[dict[str, Any]], gt_plans: list[dict[str, An
 
 
 def slot_match_rate(model_plan: list[dict[str, Any]], gt_plans: list[dict[str, Any]]) -> float:
-    """slot 级命中率（辅助指标；round_success 仍走官方全槽位阈值）。"""
+    """slot 级命中率（辅助指标；derived_round_success 仍走在线全槽位阈值）。"""
     total = 0
     matched = 0
     for gt_day in gt_plans:
@@ -171,7 +175,7 @@ def judge_round(
     model_plan = parse_person_plan(pred, person_name)
     # 解析不出官方 `=== Name's Plan ===` 结构 → 判败（不做 GT 反向兜底：
     # 旧 fallback 用"GT 值是否出现在输出里"反构造 plan 再自比相似度，
-    # 自证循环会虚高 round_success）
+    # 自证循环会虚高 derived_round_success）
     success = evaluate_slots(model_plan, gt_plans)
     judgement = ""
     if judgement_mode == "hint":
@@ -188,11 +192,11 @@ def judge_round(
 
 
 class MemoryArenaTravelCalculator(MetricCalculator):
-    """MemoryArena travel：round_success = 官方 slot 判定。"""
+    """Keep online reward diagnostics separate from uncovered official aggregates."""
 
     name: ClassVar[str] = "memoryarena_travel"
     kind: ClassVar[MetricKind] = "benchmark"
-    metrics: ClassVar[tuple[str, ...]] = ("round_success", "slot_accuracy")
+    metrics: ClassVar[tuple[str, ...]] = ("derived_round_success", "derived_slot_accuracy")
 
     def __init__(self, judgement_mode: JudgementMode = "hint"):
         self.judgement_mode = judgement_mode
@@ -212,13 +216,23 @@ class MemoryArenaTravelCalculator(MetricCalculator):
         n = 0
         for idx, question, query, gt, pred in round_items(inp):
             n += 1
+            detail: dict[str, Any] = {
+                "round_idx": idx,
+                "execution_flow": "custom_independent_sessions",
+                "metric_scope": "derived_online_reward",
+                "official_score": None,
+                "official_metrics": {"PS": None, "SPS": None, "SR": None},
+                "official_score_status": "not_measured",
+                "official_comparison_status": "not_covered",
+                "score_status": "not_measured",
+            }
+            details.append(detail)
             outcome = outcome_for_round(inp, idx)
             evidence = outcome.environment if outcome else None
             managed = task.task_environment.get("type") == "memoryarena"
-            if (managed and (evidence is None or evidence.reward is None)) or (
-                outcome and not outcome.success
-            ):
-                details.append({"round_idx": idx, "score_status": "not_measured", "official_score": None})
+            if (
+                managed and (evidence is None or evidence.reward is None or evidence.status != "completed")
+            ) or (outcome and not outcome.success):
                 continue
             name = question.get("name", "") if isinstance(question, dict) else ""
             judged = judge_round(pred, gt, name=name, judgement_mode=mode)
@@ -227,7 +241,7 @@ class MemoryArenaTravelCalculator(MetricCalculator):
             if judged["success"]:
                 successes += 1
             slot_scores.append(float(judged["slot_accuracy"]))
-            details.append(
+            detail.update(
                 {
                     "round_idx": idx,
                     "query": query,
@@ -236,14 +250,14 @@ class MemoryArenaTravelCalculator(MetricCalculator):
                     "judgement_mode": judged["judgement_mode"],
                     "judgement": judged["judgement"],
                     "score_status": "measured",
-                    "official_score": float(judged["success"]),
+                    "derived_score": float(judged["success"]),
                 }
             )
 
         values = (
             {
-                "round_success": successes / n if n else 0.0,
-                "slot_accuracy": sum(slot_scores) / len(slot_scores) if slot_scores else 0.0,
+                "derived_round_success": successes / n if n else 0.0,
+                "derived_slot_accuracy": sum(slot_scores) / len(slot_scores) if slot_scores else 0.0,
             }
             if n and all(d["score_status"] == "measured" for d in details)
             else {}
@@ -251,6 +265,12 @@ class MemoryArenaTravelCalculator(MetricCalculator):
         return MetricBundle(
             name=self.name,
             kind=self.kind,
+            score_scope="derived",
+            coverage_note=(
+                "Custom independent-session Travel flow: memory seed and off history differ from upstream. "
+                "Official PS/SPS/SR and the official on/off comparison are not measured. "
+                "Derived diagnostics use the online environment's seven slots, including current_city."
+            ),
             values=values,
             details=details,
         )

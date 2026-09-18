@@ -81,7 +81,7 @@ asyncio_mode = "auto"
 # ── mypy 配置 ───────────────────────────────────────────────────────────────
 [tool.mypy]
 python_version = "3.12"
-files = ["src", "tests"]
+files = ["src", "tests", "configs/memoryarena"]
 mypy_path = "src"
 ignore_missing_imports = true
 strict = true

@@ -56,17 +56,44 @@ class MemoryArenaSearchCalculator(MetricCalculator):
             "score_status": "not_measured",
             "official_score": None,
         }
-        bundle = MetricBundle(name=self.name, kind=self.kind, details=[detail])
+        managed = inp.task.task_environment.get("type") == "memoryarena"
+        bundle = MetricBundle(
+            name=self.name,
+            kind=self.kind,
+            details=[detail],
+            score_scope="official" if managed else "derived",
+            coverage_note=(
+                ""
+                if managed
+                else "Answer-only Search diagnostic: retrieval was not verified; official accuracy is not measured."
+            ),
+        )
         detail = bundle.details[0]
         if not rounds or len(rounds) != source_count:
             detail["reason"] = "Original final combined query is absent (empty or truncated task)."
             return bundle
         idx, _question, query, gold, pred = rounds[-1]
         outcome = outcome_for_round(inp, idx)
-        managed = inp.task.task_environment.get("type") == "memoryarena"
         if outcome is None or not outcome.success or (managed and outcome.environment is None):
             detail["reason"] = "Final query execution or required environment evidence is missing or failed."
             return bundle
+        if managed:
+            evidence = outcome.environment
+            retrieval = evidence.info.get("retrieval_actions") if evidence else None
+            if (
+                evidence is None
+                or evidence.status != "completed"
+                or evidence.session_id != outcome.session_id
+                or evidence.tool != "submit"
+                or evidence.source != "agent_submission"
+                or not isinstance(retrieval, list)
+                or not retrieval
+                or not all(isinstance(action, str) and action for action in retrieval)
+            ):
+                detail["reason"] = "No successful retrieval evidence from the final query session."
+                return bundle
+            detail["retrieval_actions"] = retrieval
+        detail["execution_flow"] = "external_agent" if managed else "answer_only_diagnostic"
         parsed = self._judge_one(pred, gold if isinstance(gold, str) else str(gold), query)
         if parsed.get("score_status") == "not_measured":
             detail.update(parsed)
@@ -78,7 +105,7 @@ class MemoryArenaSearchCalculator(MetricCalculator):
             parse_error=parsed.get("parse_error", False),
             confidence=parsed.get("confidence"),
             score_status="measured",
-            official_score=float(correct),
+            official_score=float(correct) if managed else None,
             judge_observation=parsed.get("raw"),
             judge_observations=parsed.get("observations", []),
             judge_runs=parsed.get("runs", 1),
@@ -92,7 +119,12 @@ class MemoryArenaSearchCalculator(MetricCalculator):
 
     def aggregate(self, results: list[BenchmarkResult]) -> BenchmarkResult:
         """Each complete query ID has equal weight, regardless of context length."""
-        pooled = BenchmarkResult(benchmark=self.name, details=[d for r in results for d in r.details])
+        pooled = BenchmarkResult(
+            benchmark=self.name,
+            details=[d for r in results for d in r.details],
+            score_scope=results[0].score_scope if results else "official",
+            coverage_note=" ".join(dict.fromkeys(r.coverage_note for r in results if r.coverage_note)),
+        )
         if not results or any("accuracy" not in result.values for result in results):
             return pooled
         pooled.primary_metric = "accuracy"

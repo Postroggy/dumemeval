@@ -126,6 +126,14 @@ def comparability_warnings(runs: list[RunRef]) -> list[str]:
     """控制变量不一致时显式警告（业务据此判断这张表能不能引用）。"""
     warnings: list[str] = []
 
+    for ref in runs:
+        benchmark = ref.summary.benchmark
+        if benchmark is not None and benchmark.score_scope == "derived":
+            warnings.append(
+                f"{ref.label}: derived diagnostics only; official benchmark comparison is not covered. "
+                + benchmark.coverage_note
+            )
+
     fingerprints = [ref.provenance.controls if ref.provenance else {} for ref in runs]
     for ref, fields in zip(runs, fingerprints, strict=True):
         missing = sorted(key for key in _REQUIRED_CONTROLS if not fields.get(key, "").strip())

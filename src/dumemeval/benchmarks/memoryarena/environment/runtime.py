@@ -22,7 +22,7 @@ from .config import ArenaConnection, ArenaRuntimeConfig
 from .journal import EnvironmentJournal
 from .prepare import inspect_environment
 from .scenarios import scenario_type
-from .service import OfficialService
+from .services import ArenaServices
 
 
 class MemoryArenaRuntime(TaskEnvironmentRuntime):
@@ -35,7 +35,8 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
         self.directory = (
             output_dir / "environments" / f"{safe_name}-{hashlib.sha256(task.name.encode()).hexdigest()[:8]}"
         )
-        self.service = OfficialService(config, self.directory)
+        self.services = ArenaServices(config, self.directory)
+        self.service = self.services.environment
         self.scenario = scenario_type(config.env_name)(task, config, self.directory)
         self.journal = EnvironmentJournal(self.directory / "trace.jsonl", self.service.redactor)
         self.client: ArenaClient | None = None
@@ -58,8 +59,8 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
         self.service.fingerprint["assets"] = dict(preparation.assets)
         if not preparation.ready:
             raise RuntimeError("Environment preparation incomplete: " + "; ".join(preparation.missing))
-        self.service.start()
-        env_config = dict(self.config.env_config)
+        self.services.start()
+        env_config = {**self.config.env_config, **self.services.environment_config()}
         self.client = ArenaClient(
             ArenaConnection(
                 base_url=self.service.url,
@@ -78,7 +79,6 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
                 if time.monotonic() >= deadline:
                     raise
                 time.sleep(0.1)
-        self.scenario.prepare(self.client)
         if not self.scenario.reset_per_session:
             self._initialize_episode()
         self.gateway = ToolGateway(self.config.gateway_host, self._call, self.config.max_actions)
@@ -106,7 +106,7 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
                 ArenaConnection(
                     base_url=self.service.url,
                     env_name=self.config.env_name,
-                    env_config=dict(self.config.env_config),
+                    env_config={**self.config.env_config, **self.services.environment_config()},
                     timeout_sec=self.config.timeout_sec,
                 )
             )
@@ -181,6 +181,7 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
                     self.scenario.submit(self.client, self.session, answer), evidence
                 )
                 self._submitted = True
+                self.scenario.finalize_submission(evidence, self.evidence)
                 result: JsonValue = self.scenario.feedback(evidence)
             else:
                 reply = self.scenario.invoke(self.client, call)
@@ -260,6 +261,7 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
             "conversation_state": "per_session",
             "closed": self._closed,
             "cleanup_status": self._cleanup_status,
+            "backends": self.services.provenance(),
             "config": self.config.model_dump(mode="json"),
         }
         stable_keys = (
@@ -275,11 +277,13 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
             "assets",
             "packages",
         )
+        backends = self.services.controls()
         runtime["controls"] = EnvironmentControls(
             task_id=self.task.name,
             fingerprint=(
-                {key: runtime.get(key) for key in stable_keys}
+                {**{key: runtime.get(key) for key in stable_keys}, "backends": backends}
                 if all(runtime.get(key) for key in ("revision", "environment_source_sha256", "python"))
+                and all(backends.values())
                 else {}
             ),
             uncontrolled=(
@@ -296,7 +300,7 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
         if self._closed:
             return
         errors: list[Exception] = []
-        resources = [self.gateway, self.client, self.scenario, self.service]
+        resources = [self.gateway, self.client, self.services]
         for resource in resources:
             if resource is not None:
                 try:

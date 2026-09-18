@@ -11,6 +11,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from pydantic import JsonValue
+
 REFERENCE_REVISION = "6cd9de14b71915e39ac742a20dc33785e14b6aab"
 DATASET_REVISION = "da1a37c8b19280e18627ca01cf368195a5e1d92e"
 PRODUCT_REVISION = "46120a5c931d04a47bd791965d757207b7372b62"
@@ -30,7 +32,7 @@ def write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
-def math_sample(root: Path) -> dict:
+def math_sample(root: Path) -> dict[str, JsonValue]:
     from datasets import load_dataset
 
     rows = load_dataset(
@@ -50,7 +52,7 @@ def math_sample(root: Path) -> dict:
     }
 
 
-def travel(root: Path, reference: Path) -> dict:
+def travel(root: Path, reference: Path) -> dict[str, JsonValue]:
     import requests
 
     revision = subprocess.check_output(["git", "-C", str(reference), "rev-parse", "HEAD"], text=True).strip()
@@ -79,7 +81,7 @@ def travel(root: Path, reference: Path) -> dict:
     }
 
 
-def shopping(root: Path, limit: int | None) -> dict:
+def shopping(root: Path, limit: int | None) -> dict[str, JsonValue]:
     from huggingface_hub import snapshot_download
 
     target = root / "shopping"
@@ -97,7 +99,11 @@ def shopping(root: Path, limit: int | None) -> dict:
         ],
         max_workers=3,
     )
-    result = {"source": "ai-hyz/MemoryArena-product-db", "revision": PRODUCT_REVISION, "path": str(target)}
+    result: dict[str, JsonValue] = {
+        "source": "ai-hyz/MemoryArena-product-db",
+        "revision": PRODUCT_REVISION,
+        "path": str(target),
+    }
     if limit:
         import ijson
 
@@ -113,7 +119,7 @@ def shopping(root: Path, limit: int | None) -> dict:
     return result
 
 
-def search(root: Path, worker: str | None, java_home: str | None) -> dict:
+def search(root: Path, worker: str | None, java_home: str | None) -> dict[str, JsonValue]:
     import pyarrow.parquet as pq
     from huggingface_hub import snapshot_download
 

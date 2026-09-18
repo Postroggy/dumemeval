@@ -22,9 +22,21 @@ def pool_benchmark(results: list[BenchmarkResult], warnings: list[str]) -> Bench
     name = results[0].benchmark
     if any(r.benchmark != name for r in results):
         raise ValueError("cannot aggregate different benchmarks in one run")
+    if len({r.score_scope for r in results}) != 1:
+        warnings.append("Official and derived measurements cannot be pooled together")
+        return BenchmarkResult(benchmark=name, score_scope="derived", coverage_note=warnings[-1])
+    coverage = " ".join(dict.fromkeys(r.coverage_note for r in results if r.coverage_note))
+    if coverage:
+        warnings.append(coverage)
     if name in calculator_names():
         official = get_benchmark_calculator(name).aggregate(results)
         if official is not None:
+            official = official.model_copy(
+                update={
+                    "score_scope": results[0].score_scope,
+                    "coverage_note": coverage or official.coverage_note,
+                }
+            )
             if not official.values:
                 warnings.append("Official aggregate is unmeasured: incomplete evidence or truncated tasks")
             return official
@@ -48,6 +60,8 @@ def pool_benchmark(results: list[BenchmarkResult], warnings: list[str]) -> Bench
             values[f"accuracy_{category}"] = totals["accuracy"]
         return BenchmarkResult(
             benchmark=name,
+            score_scope=results[0].score_scope,
+            coverage_note=coverage,
             primary_metric="f1",
             values=values,
             by_category=by_category,
@@ -59,6 +73,8 @@ def pool_benchmark(results: list[BenchmarkResult], warnings: list[str]) -> Bench
         warnings.append("Incomplete benchmark measurements: unavailable metrics remain unmeasured")
     return BenchmarkResult(
         benchmark=name,
+        score_scope=results[0].score_scope,
+        coverage_note=coverage,
         primary_metric=results[0].primary_metric,
         values={k: sum(r.values.get(k, 0.0) for r in results) / len(results) for k in keys},
         details=details,

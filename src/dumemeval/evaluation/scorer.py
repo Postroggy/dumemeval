@@ -29,6 +29,8 @@ class CalculatorBenchmarkScorer(BenchmarkScorer):
         bundle: MetricBundle = get_benchmark_calculator(self.benchmark, **self.options).calculate(inp)
         return BenchmarkResult(
             benchmark=bundle.name,
+            score_scope=bundle.score_scope,
+            coverage_note=bundle.coverage_note,
             primary_metric=_primary_metric(bundle),
             values=bundle.values,
             by_category=bundle.by_category,

@@ -53,7 +53,7 @@ class OfficialService:
         self.output_dir = output_dir
         self.process: subprocess.Popen[str] | None = None
         self.url = ""
-        self.fingerprint: dict[str, JsonValue] = {}
+        self.fingerprint: dict[str, JsonValue] = {"mode": mode, "cleanup_status": "not_started"}
         self.redactor = Redactor({**os.environ, **config.service_env})
         self._threads: list[threading.Thread] = []
         self.mode = mode
@@ -79,6 +79,7 @@ class OfficialService:
             env=environment,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
+        self.fingerprint["cleanup_status"] = "pending"
         assert self.process.stdin and self.process.stdout and self.process.stderr
         self.process.stdin.write(
             json.dumps(
@@ -127,6 +128,7 @@ class OfficialService:
         process = self.process
         if process is None:
             return
+        self.fingerprint["cleanup_status"] = "failed"
         if process.poll() is None:
             process.terminate()
             try:
@@ -141,3 +143,11 @@ class OfficialService:
             if stream:
                 stream.close()
         self.process = None
+        self.fingerprint["cleanup_status"] = "completed"
+
+    def stable_fingerprint(self) -> dict[str, JsonValue]:
+        """Do not compare ephemeral process identity or mistake missing provenance for proof."""
+        if not all(self.fingerprint.get(key) for key in ("revision", "environment_source_sha256", "python")):
+            return {}
+        keys = ("mode", "revision", "environment_source_sha256", "python", "fastapi", "uvicorn", "packages")
+        return {key: self.fingerprint.get(key) for key in keys}

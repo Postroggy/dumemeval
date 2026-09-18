@@ -361,8 +361,8 @@ Math/Phys 所选 backend 还需要对应 SDK：OpenAI/OpenRouter 为 openai，An
 
 ```powershell
 & $python -m pytest tests/benchmarks/memoryarena tests/test_environment_extensions.py tests/test_experiment_controls.py tests/test_control_completeness.py tests/test_memory_observation.py tests/test_scoring_checkpoint.py tests/test_verifier_clients.py -q
-& $python -m ruff check src tests
-& $python -m ruff format --check src tests
+& $python -m ruff check src tests configs/memoryarena
+& $python -m ruff format --check src tests configs/memoryarena
 # Windows 的 3 项平台断言差异及新上游复现结果见验收报告。
 & $python -m pytest tests -m 'not e2e' -q
 & $python -m mypy

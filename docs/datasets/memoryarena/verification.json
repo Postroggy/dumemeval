@@ -114,6 +114,50 @@
     "format_changed_test": "passed",
     "model_calls": 0
   },
+  "review_checks": {
+    "date": "2026-09-18",
+    "base_head": "4d240c0ea327b4ed6f9758ef89843083b6d7a4b7",
+    "scope": "PR #5 review fixes; no paid model calls or new real-run claims",
+    "ruff": "passed",
+    "format": "242 files passed",
+    "mypy": "237 source files passed; zero errors; dev dependencies; Linux platform typing",
+    "targeted_regressions": {
+      "passed": 22,
+      "failed": 0,
+      "command": "python -m pytest tests/benchmarks/memoryarena/test_review_scoring.py tests/benchmarks/memoryarena/test_services.py tests/benchmarks/memoryarena/test_prepare_assets_script.py -q"
+    },
+    "full_non_e2e_windows": {
+      "passed": 805,
+      "failed": 3,
+      "skipped": 13,
+      "failures": [
+        "tests.test_harbor_bridge.TestTrialConfigBuilder::test_basic_config",
+        "tests.test_orchestration.TestTaskDirGenerator::test_generate_structure",
+        "tests.test_run_index.TestWriteRunIndex::test_index_marks_complete_with_trials"
+      ],
+      "note": "The three failures are Windows path/execute-bit assertions and match the documented upstream baseline; PYTHONUTF8=1 was used for this run."
+    },
+    "mock_smokes": {
+      "passed": 6,
+      "configs": [
+        "examples/locomo_mini.yaml",
+        "examples/user_preference.yaml",
+        "configs/smoke/locomo_transfer.yaml",
+        "configs/smoke/locomo_test_only.yaml",
+        "configs/smoke/shopping_transfer.yaml",
+        "configs/smoke/shopping_test_only.yaml"
+      ],
+      "note": "PYTHONUTF8=1; mock mode; no model calls"
+    },
+    "build": "wheel and sdist passed",
+    "docker": "not run: Docker Desktop Linux engine failed to start on the local Windows host; GitHub Linux CI remains authoritative",
+    "implemented_boundaries": [
+      "Search managed final-session retrieval evidence is required before judge invocation",
+      "Travel derived online diagnostics are separated from official score and PS/SPS/SR remains not measured",
+      "Shopping WebShop backend lifecycle and stable provenance are owned by ArenaServices",
+      "Prepare-assets manifests are fully typed and included in lint/mypy scope"
+    ]
+  },
   "rebase_checks": {
     "date": "2026-09-17",
     "implementation_commit": "1a132d02e8867dd4e17efc45d30f8b0619eb71b6",

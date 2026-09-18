@@ -1,7 +1,7 @@
 # MemoryArena 五场景接入
 
 本实现对应 [Issue #4](https://github.com/Postroggy/dumemeval/issues/4)。Shopping、Travel、Search、Math、Phys
-通过已有评测入口运行，保留各场景的任务组织、工具和官方评分语义。
+通过已有评测入口运行，复用官方工具及已覆盖的评分函数；各场景的流程与评分覆盖范围见下表。
 交付说明按设计、复现、验收三个入口合并，减少逐轮修复记录对评审的干扰。
 
 | 阅读入口 | 内容 |
@@ -69,12 +69,20 @@ Shopping 任务模板只描述购买目标和真实购买约束；具体工具�
 | 场景 / HF 配置 | 数据、交互与任务组织 | 官方评分和差异 |
 | --- | --- | --- |
 | Shopping / `bundled_shopping` | 顺序问题/答案、商品库、lite webshop 的 search/click/购买；默认 `split_steps=true`，每商品重建环境，记忆按协议保留。 | 宿主实际购买 ASIN 与本轮目标比较；前轮买错不影响后轮。完整 bundle 才报告 overall success；没有购买证据为未测，不从文本提及推断购买。上游按系统时间初始化的随机性未控制。 |
-| Travel / `group_travel_planner` | 基础行程、名称、轮次 ID 和官方 CSV `ToolExecutor`；提交返回官方反馈。 | 保留 slot 阈值 0.7、hint 阈值 0.9 和 judgement mode。派生 slot accuracy 与 success 分开。官方加载器不支持 revision，reset 后与锁定数据行比较，漂移则拒绝运行。 |
+| Travel / `group_travel_planner` | 自定义独立会话流程：基础行程作为 context-only 会话交给 Agent，记忆由协议管理；官方 CSV `ToolExecutor` 和提交反馈复用。 | 仅报告 `derived_round_success` / `derived_slot_accuracy`，使用在线环境的七槽位和阈值；官方跨人员 PS/SPS/SR 未覆盖，`official_score` 为空。官方加载器不支持 revision，reset 后比较锁定数据，漂移则拒绝运行。 |
 | Search / `progressive_search` | 顺序上下文子问题和最终综合问题；官方 search/get_document，支持固定 BM25 或匹配的稠密索引。 | 仅判原始最终问题，按 query ID 等权聚合；截断时 accuracy 未测。默认单次 judge 保留官方解析，多次 judge 是显式多数票扩展，保留各次原文和通过比例。不调用会自行启动另一 Agent 的上游主循环；不报告 qrel recall。 |
 | Math / `formal_reasoning_math` | 对齐的问题、答案、背景；官方 reasoning 工具与 Harbor 原生 Python/Bash。 | 保留官方等价性判断与 yes 子串解析；最终子问题决定 paper pass rate，progress 按 paper 等权聚合，曲线沿用官方分母。标准答案留在宿主评分侧。 |
 | Phys / `formal_reasoning_phys` | 共用官方 MathEnvironment 与推理评分逻辑，数据和任务身份独立。 | 与 Math 分开报告。 |
 
-Travel 的隔离会话 off 基线与官方累积对话历史的基线不同，`judgement_mode=answer` 时提交后的答案反馈按官方语义返回。
+Travel 官方流程直接把 `base_person` 写入初始 memory，off 分支仍携带累计计划和前轮反馈。
+本接入由 Agent 在额外会话自主写入 memory，off 后续会话不携带上述历史，on 的写入时序也不同；
+因此 on/off 只适用于此 custom flow，不能作为官方 Travel 对照结果。在线七槽位诊断包含 `current_city`，
+官方 evaluator 的 PS/SPS/SR 使用六槽位及不同的人员/组聚合，二者不可互换。
+`judgement_mode=answer` 时本轮提交后的答案反馈仍由官方环境返回。
+Search 保留外部 Agent 流程；受管环境的最终评分会话必须附带宿主记录的本轮成功 search/get_document 证据，
+缺少证据时不调用 judge，accuracy 标为未测。前轮检索、工具列表请求和失败调用不满足要求。
+脱离受管环境的 answer-only 评分保留为派生诊断，不报告官方 accuracy。
+Shopping 只覆盖实际购买 ASIN 和整包成功；商品属性评分未覆盖，不能从 Agent 文本推断商品属性。
 Search tokenizer 固定版本及离线缓存；Shopping 的官方依赖存在冲突，独立 worker 使用已记录的兼容锁定清单，详见运行指南。
 
 <a id="lifecycle"></a>
@@ -96,6 +104,11 @@ Search tokenizer 固定版本及离线缓存；Shopping 的官方依赖存在冲
 框架 judge 与官方 Math/Phys worker 关闭 SDK 自动重试，外部代理也需按运行指南关闭隐式重发。
 
 官方 score、场景结果、judge/verifier 原文与判定、derived metrics、execution status 分别保存。
+`MetricBundle` / `BenchmarkResult` 的 `score_scope` 与 `coverage_note` 将评分资格传到报告边界；
+派生诊断不会作为 `official_task_score` 传入 Utility，不能与官方结果混合聚合，比较报告也会标明覆盖限制。
+环境进程及 Shopping 的 WebShop HTTP backend 统一由 runtime 的服务管理器启动、关闭和记录 provenance。
+ShoppingScenario 只重建商品任务及处理动作，使用注入到 client 的 backend URL，不创建服务。
+每个 backend 记录源码版本、依赖、端口和清理状态；稳定版本指纹参与对照，端口和退出码不参与。
 执行失败、跳过或没有评分证据为未测，不写成 0 分；截断 paper/bundle 不报告完整任务成功率。
 目录记忆的文件变化与可识别结构化读取是观测下界；Hermes 读取通过原生 `read_file` 与快照核验。
 
@@ -140,4 +153,6 @@ Shopping 与 Search 只有文本输出、没有执行证据时保持未测。Sea
 | 直接使用官方 Agent 主循环 | 会绕过 Harbor 与被测 memory adapter；复用官方环境和评分。 |
 | 新建插件发现、通用 judge 框架 | 本任务没有需要；沿用注册函数、包初始化和 verifier。 |
 | 从 Agent 文本判断购买 | 不能证明动作发生；采用宿主环境证据。 |
+| 为 Travel 改写核心记忆生命周期来仿造官方历史 | 会改变被测 Agent 的自主写入契约；保留明确标注的 custom flow，官方 PS/SPS/SR 与对照覆盖保持未测。 |
+| 让 Shopping 策略自行拥有第二个服务 | 生命周期与 provenance 容易分散；使用 runtime 统一管理、client 配置注入。 |
 | 将所有旧数据集一并迁移 | 超出本次集成范围，只集中 MemoryArena 自有实现。 |

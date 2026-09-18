@@ -80,7 +80,7 @@ MemoryArena 四个环境**共用同一套官方 hosting**（`env/env_server.py` 
 
 **本仓库**
 
-- Travel：`base_person`（若有）→ 一个 ingest 式 session，然后每个 planning round 一个 session。指标 `round_success` / `slot_accuracy`。
+- Travel：`base_person`（若有）→ 一个 ingest 式 session，然后每个 planning round 一个 session。当前接入只报告 `derived_round_success` / `derived_slot_accuracy`，不代表官方 PS/SPS/SR。
 - Search：每个 question 原文作为一个 session。指标 `accuracy`。
 - Math/Phys：每个 subtask 的 instruction = 该条 `backgrounds` + `questions` 原文。指标 `is_correct`。
 

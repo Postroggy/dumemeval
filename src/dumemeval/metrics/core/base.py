@@ -26,6 +26,7 @@ from ...models import (
     TraceResult,
     UtilityResult,
 )
+from ...models.results import ScoreScope
 
 MetricKind = Literal["quality", "utility", "efficiency", "trace", "benchmark"]
 
@@ -66,6 +67,8 @@ class MetricBundle(BaseModel):
 
     name: str
     kind: MetricKind
+    score_scope: ScoreScope = "official"
+    coverage_note: str = ""
     values: dict[str, float] = Field(default_factory=dict)
     by_category: dict[str, dict[str, float]] = Field(default_factory=dict)
     details: list[dict[str, Any]] = Field(default_factory=list)

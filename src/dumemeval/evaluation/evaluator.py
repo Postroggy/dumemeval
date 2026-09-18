@@ -69,7 +69,11 @@ class Evaluator:
         report = None
         if self.metrics:
             extra: dict[str, Any] = {}
-            if benchmark is not None and benchmark.primary_score is not None:
+            if (
+                benchmark is not None
+                and benchmark.score_scope == "official"
+                and benchmark.primary_score is not None
+            ):
                 extra["official_task_score"] = benchmark.primary_score
             report = MetricsAggregator(self.metrics).run(
                 MetricInput(

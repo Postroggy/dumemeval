@@ -4,8 +4,9 @@
 设计与官方差异见 [README](README.md)，复跑命令见[运行指南](clean-setup.md)，版本与哈希见
 [sources.json](sources.json) 和 [verification.json](verification.json)。
 
-实现已 rebase 到 `master` 的 `1b48fc3`，以下当前检查对应 `1a132d0`。
-2026-09-17 重新验证全仓测试、官方对照、lint、打包和 mock 示例；真实模型材料仍属于其原始执行版本。
+实现已 rebase 到 `master` 的 `1b48fc3`。2026-09-17 的检查对应历史提交 `1a132d0`，
+不能证明后续 PR head 的类型检查或 CI 已通过。2026-09-18 review 修复的结果单列于下方，
+真实模型材料仍属于其原始执行版本。
 以下是交付方的验证记录，最终验收由维护者完成。
 
 ## 验收清单
@@ -14,7 +15,7 @@
 | --- | --- | --- |
 | 1 | 五场景锁定官方版本，记录入口/数据/环境/评分/许可证 | `sources.json` 固定源码 `6cd9de1`、数据 `da1a37c` 和关键文件哈希；未声明许可证如实记录；README 给出五场景契约。 |
 | 2 | 五场景走统一评测入口 | 五套场景 YAML 与已注册 adapter/provider/calculator；`test_cli.py` 验证统一入口。实际工具验证见下表，未声称五场景全量实跑。 |
-| 3 | 保留官方任务与评分语义 | 逐商品 Shopping、Travel 阈值、Search 最终 query、Math/Phys paper 聚合；33 项固定输入官方源码对照。 |
+| 3 | 保留官方任务与评分语义 | 部分覆盖：逐商品 Shopping ASIN、Travel 在线阈值、Search 最终 query、Math/Phys paper 聚合。Travel 自定义会话流程及 PS/SPS/SR、Shopping 属性评分不属于已覆盖官方语义。 |
 | 4 | 至少一个真实环境完成 Agent 交互 | Math 中 Claude Code、Hermes 的真实 Harbor on/off 各完成 2/2 会话，并调用官方 reasoning/submit。 |
 | 5 | 多轮和跨 session memory | 首轮写入、第二独立会话读取首轮快照并更新；off 无记忆挂载。原生轨迹与快照均保留。 |
 | 6 | 三类 reset 边界可验证 | 任务/商品环境作用域、全新 Harbor 会话、协议管理的目录记忆分别管理；`test_runtime.py`、`test_completion.py` 及真实轨迹覆盖。 |
@@ -55,9 +56,24 @@ Hermes 的真实记录对应 `909e185`。Claude 记录保留执行时源码指�
 
 <a id="checks"></a>
 
-## 代码检查与上游基线
+## 本轮 review 修复与代码检查
 
-2026-09-17，Windows / Python 3.12.11；当前实现 `1a132d0`，上游 `1b48fc3`。
+2026-09-18 修复基于 PR head `4d240c0`。本轮代码与测试的源码指纹、命令及结果记录在
+`verification.json` 的 `review_checks`；这与下节的历史检查互不替代。
+
+- FastAPI 路由显式注册，保留 handler 的类型；仅安装 dev 依赖时也能运行 strict mypy。
+- Search 受管最终评分要求本轮成功检索证据；没有证据时不调用 judge。answer-only 结果为派生诊断。
+- Travel 保留在线七槽位诊断，显式标记 custom flow；官方 PS/SPS/SR 与官方 on/off 对照未测。
+- 评分范围贯穿 JSON、Markdown、Utility 与比较；派生值不再进入 `official_task_score`，不能混入官方聚合。
+- Shopping backend 由 runtime 统一管理，版本/依赖参与稳定指纹，端口/清理结果记录于 provenance；属性评分未覆盖。
+- 资源脚本纳入 `make ci` 的 Ruff/mypy 范围，补充离线 manifest 测试；Source 扫描覆盖整个 `src/dumemeval`。
+
+本轮不重新执行付费模型实验，不改变原始真实运行证据。Linux `make ci` 以当前 PR Checks 为准，
+Windows 检查不能替代 Linux 门禁。
+
+## 历史代码检查与上游基线（1a132d0）
+
+2026-09-17，Windows / Python 3.12.11；历史实现 `1a132d0`，上游 `1b48fc3`。
 
 | 检查 | 结果与范围 |
 | --- | --- |
@@ -71,10 +87,10 @@ Windows 的 3 项失败分别是 Harbor 路径分隔符、POSIX 执行位、索�
 独立检出新上游、确认导入基线源码后复现，并核对测试函数 AST 与失败断言一致。
 GitHub 的 Linux 检查执行仓库统一 `make ci`，状态以 PR Checks 为准。
 
-`checks.zip` 的 `rebase-1b48fc3/` 保存本次原始日志、JUnit、源码哈希、基线复现及摘要。
+`checks.zip` 的 `rebase-1b48fc3/` 保存 2026-09-17 的原始日志、JUnit、源码哈希、基线复现及摘要。
 `f3fdd92/` 与 `baseline/` 中的旧记录（632 通过/108 失败、152 条 mypy 错误）仅用于历史追溯，
 不能继续作为当前提交的检查结果。此前的安装产物和真实模型记录保留原始版本边界。
-文档整理检查仍记录在 `verification.json` 的 `documentation_checks`，本次结果在 `rebase_checks`。
+文档整理检查记录在 `verification.json` 的 `documentation_checks`，历史 rebase 结果在 `rebase_checks`。
 
 <a id="evidence"></a>
 
