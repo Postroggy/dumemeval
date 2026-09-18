@@ -27,6 +27,9 @@ class SessionOutcome(BaseModel):
     environment: EnvironmentEvidence | None = Field(
         default=None, description="Host-captured environment evidence; None means not measured"
     )
+    memory_entry: str | None = Field(
+        default=None, description="Host-captured history to append after a completed environment round"
+    )
     tokens_in: int = Field(default=0, ge=0, description="输入 token 数")
     tokens_out: int = Field(default=0, ge=0, description="输出 token 数")
     trial_dir: str | None = Field(

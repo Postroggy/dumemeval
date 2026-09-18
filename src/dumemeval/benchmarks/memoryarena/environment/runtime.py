@@ -7,6 +7,7 @@ import json
 import re
 import time
 from pathlib import Path
+from typing import Any
 
 from pydantic import JsonValue
 
@@ -49,6 +50,7 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
         self._closed = False
         self._cleanup_status = "pending"
         self._reset_seed = config.seed
+        self._session_ctx: dict[str, Any] = {}
 
     def open(self) -> None:
         preparation = inspect_environment(self.config)
@@ -97,6 +99,9 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
         self.scenario.validate_reset(self.evidence[-1])
         self.catalog = self.client.tools()
 
+    def set_session_context(self, session_ctx: dict[str, Any]) -> None:
+        self._session_ctx = dict(session_ctx)
+
     def begin_session(self, session: SessionSpec) -> EnvironmentBinding:
         if self.gateway is None or self.client is None or self._closed:
             raise RuntimeError("Task environment is not open")
@@ -119,6 +124,8 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
         self.service.redactor.secrets.append(token)
         self.service.redactor.secrets.sort(key=len, reverse=True)
         command = "python /opt/dumemeval/arena_tool.py"
+        memory_enabled = bool(self._session_ctx.get("memory_enabled"))
+        history_instruction = self.scenario.session_instruction(session, memory_enabled=memory_enabled)
         return EnvironmentBinding(
             env={
                 "DUMEMEVAL_TOOL_URL": f"http://{self.config.agent_host}:{self.gateway.port}/tool",
@@ -143,6 +150,7 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
                 "Do not reset the environment or guess previous observations. "
                 "This session has a fresh conversation; only configured memory transfers between sessions.\n"
                 "A session without a question only ingests the provided context and does not submit an answer."
+                + ("\n\n" + history_instruction if history_instruction else "")
             ),
         )
 
@@ -226,6 +234,7 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
         if submitted:
             outcome.environment = submitted
             outcome.observation = str(submitted.arguments["answer"])
+            outcome.memory_entry = self.scenario.memory_entry(submitted)
         if session.query is not None and submitted is None:
             outcome.success = False
             outcome.error = outcome.error or "Agent did not submit a result through the environment tools"

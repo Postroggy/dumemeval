@@ -49,9 +49,16 @@ class SessionRunner:
             "memory_transfer_dir": str(self.memory_transfer.transfer_dir),
         }
 
+        memory_enabled = self.protocol.should_inject_memory(True) and self.adapter.spec.type != "none"
         self.adapter.setup(task)
         # benchmark 评测：先把历史对话灌入被测 memory（如 Hermes L0 seed）
-        self.adapter.seed_history(task)
+        if memory_enabled and task.data.get("initial_memory") and not self.adapter.supports_initial_memory:
+            raise ValueError("This memory adapter cannot seed the task's required initial memory")
+        if memory_enabled and task.data.get("host_memory_history") and not self.adapter.supports_host_history:
+            raise ValueError("This memory adapter cannot append the task's required environment history")
+        if memory_enabled:
+            self.adapter.seed_history(task)
+        session_ctx["memory_enabled"] = memory_enabled
         await self.hooks.emit(LifecycleEvent.EVAL_START, task.sessions[0], session_ctx)
 
         # memory_instruction / task_environment 的 instruction 后缀（全 task 一致）
@@ -102,6 +109,10 @@ class SessionRunner:
                 outcome.trial_dir = str(trial_dir)
             if self.protocol.should_adapter_inject(session.memory_inject):
                 self.adapter.observe_execution(session, outcome)
+                # A completed environment submission remains part of the official
+                # history even when another tool call makes the session fail.
+                if outcome.memory_entry:
+                    self.adapter.append_history(session, outcome.memory_entry)
             if self.protocol.should_snapshot(session.memory_inject):
                 self.adapter.snapshot(session, self.snapshot_dir)
             if trial_dir is not None and self.protocol.should_collect_memory(session.memory_inject):

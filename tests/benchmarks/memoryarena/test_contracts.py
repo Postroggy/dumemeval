@@ -49,8 +49,8 @@ def test_optional_metric_input_does_not_fabricate_scores(name: str) -> None:
 @pytest.mark.parametrize(
     "name,expected",
     [
-        ("shopping", ["match_ground_truth", "overall_success"]),
-        ("travel", ["derived_round_success", "derived_slot_accuracy"]),
+        ("shopping", ["match_ground_truth", "overall_success", "attribute_match_ratio"]),
+        ("travel", ["PS", "SPS", "SR", "derived_round_success", "derived_slot_accuracy"]),
         ("search", ["accuracy", "confidence"]),
         ("math", ["is_correct", "avg_progress_score", "overall_average_passrate"]),
         ("phys", ["is_correct", "avg_progress_score", "overall_average_passrate"]),
@@ -100,10 +100,10 @@ def test_invalid_sampling_is_not_silently_treated_as_full_dataset(name: str, lim
 def test_travel_hf_names_base_plan_and_indexed_answer_alignment() -> None:
     adapter = MemoryArenaTravelAdapter()
     task = adapter.build_tasks(adapter.data_type.from_raw(raw_case("travel")))[0]
-    assert "Train T1" in task.sessions[0].instruction
+    assert "Train T1" in task.data["initial_memory"]
     assert task.data["questions"][0]["name"] == "Bob"
     assert task.data["questions"][0]["round_idx"] == 1
-    assert "=== Bob's Plan ===" in task.sessions[1].instruction
+    assert "=== Bob's Plan ===" in task.sessions[0].instruction
     rows = raw_case("travel")
     rows[0]["questions"] = [
         {"round_idx": 9, "name": "Bob", "query": "first"},

@@ -15,12 +15,12 @@
 | --- | --- | --- |
 | 1 | 五场景锁定官方版本，记录入口/数据/环境/评分/许可证 | `sources.json` 固定源码 `6cd9de1`、数据 `da1a37c` 和关键文件哈希；未声明许可证如实记录；README 给出五场景契约。 |
 | 2 | 五场景走统一评测入口 | 五套场景 YAML 与已注册 adapter/provider/calculator；`test_cli.py` 验证统一入口。实际工具验证见下表，未声称五场景全量实跑。 |
-| 3 | 保留官方任务与评分语义 | 部分覆盖：逐商品 Shopping ASIN、Search 最终 query、Math/Phys paper 聚合；Travel 仅有自定义会话流程的在线阈值派生诊断。Travel 官方 PS/SPS/SR 与官方 on/off 未实现，Shopping attribute scoring 未覆盖；Search 不报告 qrel recall。 |
+| 3 | 保留官方任务与评分语义 | 逐商品 Shopping ASIN、商品属性字符串匹配、Travel 六槽位 PS/SPS/SR、Search 最终 query、Math/Phys paper 聚合已有实现。Travel 默认支持官方 on/off 历史交付路径；Shopping LLM 属性 judge 与完整 fallback reward、Search qrel recall 尚未接入。新增 Travel 路径未记录真实模型对照结果。 |
 | 4 | 至少一个真实环境完成 Agent 交互 | Math 中 Claude Code、Hermes 的真实 Harbor on/off 各完成 2/2 会话，并调用官方 reasoning/submit。 |
 | 5 | 多轮和跨 session memory | 首轮写入、第二独立会话读取首轮快照并更新；off 无记忆挂载。原生轨迹与快照均保留。 |
 | 6 | 三类 reset 边界可验证 | 任务/商品环境作用域、全新 Harbor 会话、协议管理的目录记忆分别管理；`test_runtime.py`、`test_completion.py` 及真实轨迹覆盖。 |
 | 7 | on/off 控制与样本对齐 | 历史同一完整 Math 样本，实际用户/系统提示和 Skill 一致，9 项当时指纹一致。旧报告缺新增字段，当前自动比较标为未验证，详见下文。 |
-| 8 | 五场景 fixture / 已覆盖评分路径对照 | `tests/benchmarks/memoryarena/fixtures/` 与 `test_official_parity.py`；本地 HTTP 中 judge 为确定性固定样例，另有真实 Math judge 正反例。对照不包含 Travel 官方 PS/SPS/SR 或 Shopping attribute scoring。 |
+| 8 | 五场景 fixture / 已覆盖评分路径对照 | `tests/benchmarks/memoryarena/fixtures/`、`test_official_parity.py` 与 `test_official_travel_shopping.py`；新增 Travel 六槽位人员规则及 Shopping 属性字符串回退与固定官方源码对照。本地 HTTP 中 judge 为确定性固定样例，另有真实 Math judge 正反例。 |
 | 9 | 官方分数、judge、derived metrics、状态分离 | calculator、verifier observation、TaskExecution 和报告分别保存；相关评分与完成状态测试。 |
 | 10 | 失败/超时/跳过/未测/0 分可区分 | 缺证据、执行失败、跳过 judge 和截断任务不产生官方零分；`test_completion.py`、`test_search_scoring.py`。 |
 | 11 | 重试无重复写入/动作/评分 | 投递身份与服务缓存、隔离的记忆传递目录、评分检查点；工具重试、任务失败恢复和 `test_scoring_checkpoint.py`。 |
@@ -58,18 +58,22 @@ Hermes 的真实记录对应 `909e185`。Claude 记录保留执行时源码指�
 
 ## 本轮 review 修复与代码检查
 
-2026-09-18 首轮修复基于 PR head `4d240c0`，最终 review 修复提交为 `d8da117`。本轮代码与测试的源码指纹、命令及结果记录在
-`verification.json` 的 `review_checks`；这与下节的历史检查互不替代。
+2026-09-18 首轮 review 修复记录于 `verification.json` 的 `review_checks`。随后补入 Travel 官方评分、
+on/off 历史路径与 Shopping 属性字符串评分；以下新增验证以本次提交为准，未写入旧证据包。
 
 - FastAPI 路由显式注册，保留 handler 的类型；仅安装 dev 依赖时也能运行 strict mypy。
 - Search 受管最终评分要求本轮成功检索证据；没有证据时不调用 judge。answer-only 结果为派生诊断。
-- Travel 保留在线七槽位诊断，显式标记 custom flow；官方 PS/SPS/SR 与官方 on/off 对照未测。
+- Travel 增加默认官方历史控制路径与六槽位 PS/SPS/SR；旧七槽位诊断仅在显式 custom flow 下使用。新路径已有固定样例和官方源码对照，尚未做真实模型 on/off 实验。
 - 评分范围贯穿 JSON、Markdown、Utility 与比较；派生值不再进入 `official_task_score`，不能混入官方聚合。
-- Shopping backend 由 runtime 统一管理，版本/依赖参与稳定指纹，端口/清理结果记录于 provenance；属性评分未覆盖。
+- Shopping backend 由 runtime 统一管理，版本/依赖参与稳定指纹，端口/清理结果记录于 provenance；新增官方商品目录名称的属性字符串匹配。查找成功但无名称时计零，查找失败时未测。
 - 资源脚本纳入 `make ci` 的 Ruff/mypy 范围，补充离线 manifest 测试；Source 扫描覆盖整个 `src/dumemeval`。
 
 本轮不重新执行付费模型实验，不改变原始真实运行证据。Linux `make ci` 以当前 PR Checks 为准，
 Windows 检查不能替代 Linux 门禁。
+
+当前 Windows / Python 3.12.11：`PYTHONUTF8=1` 的全仓非 e2e 测试为 766 通过、3 失败、61 跳过；
+3 项为下节已复现的 Windows 路径/权限断言。MemoryArena 专项为 231 通过、44 跳过；
+新增 Travel/Shopping 两项固定官方源码对照通过。Ruff、格式、strict mypy（239 文件）与 wheel/sdist 构建通过。
 
 ## 历史代码检查与上游基线（1a132d0）
 
@@ -112,6 +116,7 @@ GitHub 的 Linux 检查执行仓库统一 `make ci`，状态以 PR Checks 为准
 - 未运行五场景全量数据，未证明正向或统计显著的记忆收益；真实模型结果不代表后续修复代码的重新实跑。
 - 两组保持配置及采样设置一致，未声称模型服务提供全局确定性随机种子。
 - Shopping 上游按系统时间初始化的随机性未控制，已写入 provenance；Math 对照不使用 Shopping 环境。
+- Travel 新增的官方 on/off 路径和 Shopping 属性评分只有确定性样例与源码对照，尚无本次提交的真实 Agent 运行结果；Travel on 历史中的官方 Agent 内部 scratchpad 无法由宿主获取，当前为空。Shopping 的上游 LLM 属性 judge 与完整 fallback reward 仍未覆盖。
 - Search 多数票是可选扩展，不报告 qrel recall；官方依赖与兼容 worker 的差异已记录。
 - Hermes 的 Harbor ATIF 未携带会话级 token 统计；框架 token/cost=0 表示未测，原生用量另存，费用未知。
 - 记忆观测是下界：Claude 结构化 Read 可自动计数，Hermes 使用原生读取证据；任意 shell 读取或写后恢复原内容可能无法计数。

@@ -7,12 +7,14 @@
 - webshop_env.py ``_build_judgement``：单步环境购买列表与该步目标列表完全相等。
 
 本计算器仅使用 host 采集的 environment evidence；提及 ASIN 不代表购买。
-商品属性与 compute_reward.py 的 fallback reward 未覆盖；没有购买商品属性证据时不计算。
+商品属性按 reward_helpers.py 的字符串回退规则与官方商品目录名称匹配；
+无可信购买商品名称时不计算。compute_reward.py 的 LLM attribute judge 与完整 fallback reward 未覆盖。
 不把 travel 的 slot / round_success 套到购物任务上。
 """
 
 from __future__ import annotations
 
+import re
 from typing import Any, ClassVar
 
 from dumemeval.metrics.core.base import MetricBundle, MetricCalculator, MetricInput, MetricKind
@@ -37,12 +39,28 @@ def normalize_expected_asins(ground_truth: Any) -> list[str]:
     return []
 
 
+def score_attributes(
+    attributes: list[str], purchased_name: str | None
+) -> tuple[float | None, list[str], list[str]]:
+    """Pinned reward_helpers.compute_attribute_matches string fallback."""
+    if not attributes:
+        return None, [], []
+
+    def normalize(value: str) -> str:
+        return re.sub(r"\s+", " ", re.sub(r"[-/]", " ", value.lower())).strip()
+
+    name = normalize(purchased_name or "")
+    matched = [attr for attr in attributes if normalize(attr) and normalize(attr) in name]
+    missing = [attr for attr in attributes if attr not in matched]
+    return len(matched) / len(attributes), matched, missing
+
+
 class MemoryArenaShoppingCalculator(MetricCalculator):
     """Score each product episode; legacy cumulative evidence requires aligned deltas."""
 
     name: ClassVar[str] = "memoryarena_shopping"
     kind: ClassVar[MetricKind] = "benchmark"
-    metrics: ClassVar[tuple[str, ...]] = ("match_ground_truth", "overall_success")
+    metrics: ClassVar[tuple[str, ...]] = ("match_ground_truth", "overall_success", "attribute_match_ratio")
 
     def calculate(self, inp: MetricInput) -> MetricBundle:
         if inp.task is None:
@@ -53,6 +71,8 @@ class MemoryArenaShoppingCalculator(MetricCalculator):
         outcomes = {outcome.session_id: outcome for outcome in inp.outcomes}
         previous: dict[str, list[str]] = {}
         flags: list[float] = []
+        attribute_ratios: list[float] = []
+        attribute_rounds = 0
         for idx, session in enumerate(sessions):
             gold = answers[idx] if idx < len(answers) else None
             round_expected = normalize_expected_asins(gold)
@@ -66,7 +86,7 @@ class MemoryArenaShoppingCalculator(MetricCalculator):
                 "score_status": "not_measured",
                 "official_score": None,
                 "attribute_score_status": "not_measured",
-                "attribute_score_reason": "Purchased product attributes are not captured.",
+                "attribute_score_reason": "Purchased product name is unavailable.",
             }
             if evidence and evidence.env_name == "webshop" and outcome and outcome.success and round_expected:
                 purchases = evidence.info.get("purchased_asins")
@@ -99,6 +119,51 @@ class MemoryArenaShoppingCalculator(MetricCalculator):
                         episode_scope=evidence.info.get("episode_scope", "legacy_cumulative"),
                         environment_task_id=evidence.task_id,
                     )
+                    attributes_raw = gold.get("attributes") if isinstance(gold, dict) else None
+                    if attributes_raw is None and isinstance(gold, dict):
+                        requirements = gold.get("requirements")
+                        attributes_raw = (
+                            requirements.get("attributes") if isinstance(requirements, dict) else None
+                        )
+                    if isinstance(attributes_raw, list) and all(
+                        isinstance(attr, str) for attr in attributes_raw
+                    ):
+                        if attributes_raw:
+                            attribute_rounds += 1
+                            products = evidence.info.get("purchased_products")
+                            name: str | None = None
+                            if not round_purchases:
+                                name = ""
+                            elif isinstance(products, list):
+                                product = next(
+                                    (
+                                        item
+                                        for item in products
+                                        if isinstance(item, dict)
+                                        and str(item.get("asin", "")).upper() == round_purchases[-1]
+                                    ),
+                                    None,
+                                )
+                                if isinstance(product, dict) and not evidence.info.get(
+                                    "attribute_lookup_error"
+                                ):
+                                    product_name = product.get("name")
+                                    if product_name is None or isinstance(product_name, str):
+                                        name = product_name or ""
+                            if name is not None:
+                                ratio, matched, missing = score_attributes(attributes_raw, name)
+                                assert ratio is not None
+                                attribute_ratios.append(ratio)
+                                detail.update(
+                                    attribute_score_status="measured",
+                                    attribute_score_reason="",
+                                    attribute_match_ratio=ratio,
+                                    matched_attributes=matched,
+                                    missing_attributes=missing,
+                                    purchased_name=name,
+                                )
+                        else:
+                            detail["attribute_score_reason"] = "No attribute constraints in this step."
             details.append(detail)
 
         values: dict[str, float] = {}
@@ -107,6 +172,8 @@ class MemoryArenaShoppingCalculator(MetricCalculator):
             # A truncated sample is not a completed official bundle.
             if len(sessions) == inp.task.data.get("source_round_count", len(sessions)):
                 values["overall_success"] = float(all(flags))
+            if attribute_rounds and len(attribute_ratios) == attribute_rounds:
+                values["attribute_match_ratio"] = sum(attribute_ratios) / attribute_rounds
         return MetricBundle(
             name=self.name,
             kind=self.kind,

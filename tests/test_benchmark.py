@@ -9,7 +9,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import dumemeval.datasets.benchmarks  # noqa: F401  触发注册
-from dumemeval.benchmarks.memoryarena.datasets.travel import MemoryArenaTravelData
+from dumemeval.benchmarks.memoryarena.datasets.travel import MemoryArenaTravelAdapter, MemoryArenaTravelData
 from dumemeval.datasets import benchmark_names, get_benchmark
 from dumemeval.datasets.benchmarks.locomo import LoCoMoAdapter, LoCoMoData
 from dumemeval.evaluation import CalculatorBenchmarkScorer
@@ -169,11 +169,11 @@ class TestLoCoMo:
 
 class TestMemoryArenaTravel:
     def test_from_raw_and_build(self, travel_data: list[Any]) -> None:
-        a = get_benchmark("memoryarena_travel")
+        a = cast(MemoryArenaTravelAdapter, get_benchmark("memoryarena_travel"))
         data = a.data_type.from_raw(travel_data)
         assert isinstance(data, MemoryArenaTravelData)
 
-        tasks = a.build_tasks(data)
+        tasks = a.build_tasks(data, flow="custom")
         assert len(tasks) == 1
         t = tasks[0]
         assert len(t.sessions) == 3
@@ -182,16 +182,16 @@ class TestMemoryArenaTravel:
         assert t.benchmark == "memoryarena_travel"
 
     def test_round_dependency(self, travel_data: list[Any]) -> None:
-        a = get_benchmark("memoryarena_travel")
+        a = cast(MemoryArenaTravelAdapter, get_benchmark("memoryarena_travel"))
         data = a.data_type.from_raw(travel_data)
-        t = a.build_tasks(data)[0]
+        t = a.build_tasks(data, flow="custom")[0]
         assert "之前的回合信息" in t.sessions[2].instruction
 
     def test_evaluate_metrics(self, travel_data: list[Any]) -> None:
         """在线 slot 判定：`=== Plan ===` 结构 + transportation 真值 → derived_round_success=1.0。"""
-        a = get_benchmark("memoryarena_travel")
+        a = cast(MemoryArenaTravelAdapter, get_benchmark("memoryarena_travel"))
         data = a.data_type.from_raw(travel_data)
-        task = a.build_tasks(data)[0]
+        task = a.build_tasks(data, flow="custom")[0]
         outputs = [
             AgentOutput(
                 query="Plan day 1 transport.",
@@ -211,9 +211,9 @@ class TestMemoryArenaTravel:
 
     def test_unstructured_output_scores_zero(self, travel_data: list[Any]) -> None:
         """无官方结构的裸文本 → derived_round_success=0（旧 GT 反向兜底会自证虚高，已删）。"""
-        a = get_benchmark("memoryarena_travel")
+        a = cast(MemoryArenaTravelAdapter, get_benchmark("memoryarena_travel"))
         data = a.data_type.from_raw(travel_data)
-        task = a.build_tasks(data)[0]
+        task = a.build_tasks(data, flow="custom")[0]
         outputs = [
             AgentOutput(query="Plan day 1 transport.", output="Flight F1"),
             AgentOutput(

@@ -17,4 +17,7 @@
 通用场景模板需导出 `MEMORYARENA_AGENT_MODEL`、`MEMORYARENA_JUDGE_MODEL`、`ANTHROPIC_AUTH_TOKEN`、
 `ANTHROPIC_BASE_URL`；外部资源与 worker 的变量按运行指南设置。
 通用 on/off 会改变记忆提示后缀，严格同提示对照使用 `controlled-math*.yaml`。
+Travel 的默认流程按官方六槽位报告 PS/SPS/SR；on 用目录记忆和 `memory_session_transfer`，
+off 用 `test_only`，环境仍提供累计计划与反馈。Shopping 属性分使用官方商品目录中的购买商品名称，
+仅覆盖字符串匹配回退规则。
 新实验使用新输出目录，`--no-resume` 不会移除评分检查点；缺失证据或跳过评分保持未测。

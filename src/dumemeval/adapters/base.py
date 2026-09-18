@@ -44,6 +44,8 @@ class BaseMemoryAdapter(ABC):
     """
 
     type_name: ClassVar[str] = ""
+    supports_initial_memory: ClassVar[bool] = False
+    supports_host_history: ClassVar[bool] = False
 
     def __init__(self, spec: MemorySpec):
         self.spec = spec
@@ -87,6 +89,10 @@ class BaseMemoryAdapter(ABC):
         benchmark 评测需要"先把历史记忆灌进被测 memory"时（如 Hermes 的
         L0 对话灌入），adapter 覆写本方法从 task.data 取对话并写入。
         """
+        return None
+
+    def append_history(self, session: SessionSpec, entry: str) -> None:
+        """Store host-captured environment history after a completed round."""
         return None
 
     def memory_usage_hint(self) -> str | None:

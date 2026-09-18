@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -35,6 +36,10 @@ class TaskEnvironmentRuntime(ABC):
     @abstractmethod
     def begin_session(self, session: SessionSpec) -> EnvironmentBinding:
         """Apply the scenario's episode boundary and issue a fresh capability."""
+
+    def set_session_context(self, session_ctx: dict[str, Any]) -> None:
+        """Receive generic protocol state before binding a session, when needed."""
+        return None
 
     @abstractmethod
     def finish_session(self, session: SessionSpec, outcome: SessionOutcome) -> SessionOutcome:

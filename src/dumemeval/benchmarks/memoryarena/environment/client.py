@@ -63,6 +63,14 @@ class ArenaClient:
             payload["step_index"] = step_index
         self._request("shopping_task", payload)
 
+    def shopping_product(self, asin: str) -> str | None:
+        """Resolve a purchased ASIN through the pinned official product catalog."""
+        self._require_active()
+        name = self._request("shopping_product", {"asin": asin}).get("name")
+        if name is not None and not isinstance(name, str):
+            raise ValueError("Official product name is invalid")
+        return name
+
     def initialize(self) -> None:
         if self._initialized or self._closed or self._ambiguous:
             raise RuntimeError("Environment client cannot be initialized twice or reused")

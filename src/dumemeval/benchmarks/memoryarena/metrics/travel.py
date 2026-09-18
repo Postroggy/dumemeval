@@ -1,8 +1,7 @@
-"""Travel online-reward diagnostics for the custom independent-session flow.
+"""Travel scoring for the official flow and optional custom diagnostics.
 
-These seven-slot diagnostics are derived metrics, not the official evaluator's
-six-slot, cross-person PS/SPS/SR. Those metrics and the official on/off comparison
-are not measured by this integration.
+The official flow uses the pinned offline evaluator's six-slot PS/SPS/SR.
+The custom flow retains seven-slot online-reward diagnostics as derived metrics.
 
 对齐 vendors/MemoryArena/env/env_systems/travel_env.py：
 - 成功判定：_evaluate_slots（slot 相似度 ≥ 0.7），不是「有输出就算成功」
@@ -25,6 +24,7 @@ from dumemeval.metrics.core.base import (
     outcome_for_round,
     round_items,
 )
+from dumemeval.models import BenchmarkResult
 
 SLOTS = [
     "current_city",
@@ -196,7 +196,7 @@ class MemoryArenaTravelCalculator(MetricCalculator):
 
     name: ClassVar[str] = "memoryarena_travel"
     kind: ClassVar[MetricKind] = "benchmark"
-    metrics: ClassVar[tuple[str, ...]] = ("derived_round_success", "derived_slot_accuracy")
+    metrics: ClassVar[tuple[str, ...]] = ("PS", "SPS", "SR", "derived_round_success", "derived_slot_accuracy")
 
     def __init__(self, judgement_mode: JudgementMode = "hint"):
         self.judgement_mode = judgement_mode
@@ -205,6 +205,8 @@ class MemoryArenaTravelCalculator(MetricCalculator):
         task = inp.task
         if task is None:
             return MetricBundle(name=self.name, kind=self.kind)
+        if task.data.get("execution_flow") == "official_travel":
+            return self._calculate_official(inp)
         data = task.data if isinstance(task.data, dict) else {}
         mode = inp.extra.get("judgement_mode") or data.get("judgement_mode") or self.judgement_mode
         if mode not in ("hint", "answer", "none"):
@@ -274,3 +276,75 @@ class MemoryArenaTravelCalculator(MetricCalculator):
             values=values,
             details=details,
         )
+
+    def _calculate_official(self, inp: MetricInput) -> MetricBundle:
+        """Score complete host-observed groups with the pinned offline evaluator's rules."""
+        from .travel_official import group_values, person_result
+
+        assert inp.task is not None
+        task = inp.task
+        base = task.data.get("base_person")
+        base_plan = base.get("daily_plans", []) if isinstance(base, dict) else []
+        details: list[dict[str, Any]] = []
+        for idx, question, query, gt, _pred in round_items(inp):
+            outcome = outcome_for_round(inp, idx)
+            evidence = outcome.environment if outcome else None
+            detail: dict[str, Any] = {
+                "sample_id": task.data.get("sample_id"),
+                "round_idx": idx,
+                "person_idx": question.get("round_idx") if isinstance(question, dict) else idx + 1,
+                "query": query,
+                "execution_status": "completed" if outcome and outcome.success else "failed",
+                "score_status": "not_measured",
+                "official_score": None,
+            }
+            details.append(detail)
+            if (
+                outcome is None
+                or evidence is None
+                or evidence.status != "completed"
+                or evidence.env_name != "travel_planner"
+                or evidence.session_id != outcome.session_id
+                or evidence.tool != "submit"
+                or evidence.info.get("history_mode") not in {"memory_on", "memory_off"}
+                or evidence.info.get("history_rounds") != idx
+            ):
+                continue
+            name = str(question.get("name", "")) if isinstance(question, dict) else ""
+            _, ground_truth = _as_daily_plans(gt, name)
+            if not ground_truth:
+                continue
+            host_answer = evidence.arguments.get("answer")
+            submitted = parse_person_plan(
+                host_answer if isinstance(host_answer, str) else outcome.observation, name
+            )
+            full_pass, constraint_rate = person_result(ground_truth, submitted, base_plan)
+            detail.update(
+                score_status="measured",
+                history_mode=evidence.info["history_mode"],
+                official_score=float(full_pass),
+                person_full_pass=full_pass,
+                constraint_rate=constraint_rate,
+                submitted_plan=submitted,
+            )
+        complete = (
+            len(details) == task.data.get("source_round_count")
+            and bool(details)
+            and all(item["score_status"] == "measured" for item in details)
+            and len({item.get("history_mode") for item in details}) == 1
+        )
+        return MetricBundle(
+            name=self.name,
+            kind=self.kind,
+            score_scope="official",
+            coverage_note="Pinned Travel offline evaluator: six-slot PS/SPS/SR percentages.",
+            values=group_values(details) if complete else {},
+            details=details,
+        )
+
+    def aggregate(self, results: list[BenchmarkResult]) -> BenchmarkResult | None:
+        if not results or results[0].score_scope != "official":
+            return None
+        from .travel_official import aggregate_groups
+
+        return aggregate_groups(results)

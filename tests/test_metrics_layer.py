@@ -213,5 +213,6 @@ class TestAggregator:
         assert declared_metric_names("memoryarena_shopping") == [
             "match_ground_truth",
             "overall_success",
+            "attribute_match_ratio",
         ]
         assert declared_metric_names("nope") == []

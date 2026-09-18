@@ -2,7 +2,7 @@
 
 数据来源 MemoryArena group_travel_planner：
 - 每个样本 = base_person（初始记忆）+ 8 个 interdependent questions
-- 自定义独立会话流程；在线 slot/反馈诊断不等于官方 PS/SPS/SR
+- 默认官方历史控制流程与六槽位 PS/SPS/SR；可选 custom 流程保留在线诊断
 - 适配器只负责 build_tasks；evaluate 委托统一指标层
 
 Source: https://github.com/ZexueHe/MemoryArena · Paper: https://arxiv.org/abs/2602.16313
@@ -91,6 +91,7 @@ class MemoryArenaTravelAdapter(BenchmarkAdapter):
         subset: int | None = None,
         max_questions: int | None = None,
         judgement_mode: JudgementMode | None = None,
+        flow: Literal["official", "custom"] = "official",
     ) -> list[EvalTask]:
         """每个样本 → 一个 multi-session EvalTask（round 间有依赖）。"""
         if not isinstance(data, MemoryArenaTravelData):
@@ -109,7 +110,7 @@ class MemoryArenaTravelAdapter(BenchmarkAdapter):
 
             sessions: list[SessionSpec] = []
 
-            if base_person:
+            if base_person and flow == "custom":
                 base_text = f"旅行者：{base_person.get('name', '')}\n需求：{base_person.get('query', '')}"
                 base_text += f"\n基础行程：\n{_json_dumps(base_person.get('daily_plans', []))}"
                 sessions.append(
@@ -125,7 +126,11 @@ class MemoryArenaTravelAdapter(BenchmarkAdapter):
                     SessionSpec(
                         id=len(sessions) + 1,
                         instruction=(
-                            f"这是第 {round_idx + 1} 个规划回合。请根据你记住的旅行者偏好"
+                            f"Create a travel plan for {q.name}.\n\nQuery: {q.query}\n\n"
+                            "Use the available travel tools. Output only the plan in the exact format "
+                            f"starting with === {q.name}'s Plan ===, followed by Day N and the plan slots."
+                            if flow == "official"
+                            else f"这是第 {round_idx + 1} 个规划回合。请根据你记住的旅行者偏好"
                             f"（包括之前的回合信息）完成这个规划请求：\n\n{q.query}\n\n"
                             f"输出格式：=== {q.name}'s Plan ===，随后逐日列出 Day N: 和行程槽位。"
                         ),
@@ -155,8 +160,25 @@ class MemoryArenaTravelAdapter(BenchmarkAdapter):
                     "answers": answers,
                     "base_person": base_person,
                     "judgement_mode": self.judgement_mode,
-                    "execution_flow": "custom_independent_sessions",
-                    "official_history_compatible": False,
+                    "execution_flow": "official_travel"
+                    if flow == "official"
+                    else "custom_independent_sessions",
+                    "official_history_compatible": flow == "official",
+                    "host_memory_history": flow == "official",
+                    "initial_memory": (
+                        _json_dumps(
+                            {
+                                "name": base_person.get("name", ""),
+                                "query": base_person.get("query", ""),
+                                "is_base_person": True,
+                                "final_plan": _format_person_plan(
+                                    str(base_person.get("name", "")), base_person.get("daily_plans", [])
+                                ),
+                            }
+                        )
+                        if flow == "official" and base_person
+                        else ""
+                    ),
                 },
                 benchmark="memoryarena_travel",
             )
@@ -187,3 +209,25 @@ def _json_dumps(obj: Any) -> str:
     if isinstance(obj, str):
         return obj
     return json.dumps(obj, ensure_ascii=False)
+
+
+def _format_person_plan(name: str, days: Any) -> str:
+    """Pinned run_travel.format_person_plan for the initial memory record."""
+    lines = [f"=== {name}'s Plan ==="]
+    if isinstance(days, list):
+        for day in days:
+            if not isinstance(day, dict):
+                continue
+            lines.append(f"Day {day.get('days') or day.get('day')}:")
+            for slot in (
+                "current_city",
+                "transportation",
+                "breakfast",
+                "attraction",
+                "lunch",
+                "dinner",
+                "accommodation",
+            ):
+                lines.append(f"{slot.replace('_', ' ').title()}: {day.get(slot, '-')}")
+            lines.append("")
+    return "\n".join(lines)

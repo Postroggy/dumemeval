@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import cast
@@ -37,6 +38,10 @@ class ArenaScenario(ABC):
         """Prepare a scene-defined episode without changing the memory lifecycle."""
         return None
 
+    def session_instruction(self, session: SessionSpec, *, memory_enabled: bool) -> str:
+        """Provide scenario context for the current isolated conversation."""
+        return ""
+
     def validate_reset(self, evidence: EnvironmentEvidence) -> None:
         """Validate any environment-selected task data against the pinned input."""
         return None
@@ -60,6 +65,10 @@ class ArenaScenario(ABC):
     def feedback(self, evidence: EnvironmentEvidence) -> dict[str, JsonValue]:
         return {"submitted": True}
 
+    def memory_entry(self, evidence: EnvironmentEvidence) -> str | None:
+        """Return host-captured history for the configured memory adapter."""
+        return None
+
 
 class ReasoningScenario(ArenaScenario):
     def submit(self, client: ArenaClient, session: SessionSpec, answer: str) -> EnvironmentEvidence:
@@ -71,8 +80,85 @@ class ReasoningScenario(ArenaScenario):
 class TravelScenario(ArenaScenario):
     seed_policy = "official_group_id"
 
+    def __init__(self, task: EvalTask, config: ArenaRuntimeConfig, directory: Path) -> None:
+        super().__init__(task, config, directory)
+        self.previous_plans: list[str] = []
+        self.previous_feedback: list[str] = []
+        self.history_mode = ""
+        self.history_rounds = 0
+
+    def session_instruction(self, session: SessionSpec, *, memory_enabled: bool) -> str:
+        if self.task.data.get("execution_flow") != "official_travel":
+            return ""
+        self.history_mode = "memory_on" if memory_enabled else "memory_off"
+        self.history_rounds = len(self.previous_plans)
+        base = self.task.data.get("base_person")
+        base = base if isinstance(base, dict) else {}
+        if memory_enabled:
+            return (
+                "Retrieve the base traveler's confirmed plan from persistent memory when present. "
+                "Store each submitted plan and its feedback for later travelers."
+            )
+        name = str(base.get("name", ""))
+        base_plan = _format_travel_plan(name, base.get("daily_plans", [])) if base else ""
+        context = ""
+        if base:
+            context = (
+                f"=== {name}'s Request (Already Planned) ===\n"
+                f"{name} has already made their travel request and their plan has been finalized.\n"
+                f"{name}'s Query: {base.get('query', '')}\n"
+                f"=== {name}'s Confirmed Plan ===\n{base_plan}\n"
+                f"Generate plans for all travelers except {name}.\n"
+            )
+        if self.previous_plans:
+            questions = self.task.data.get("questions", [])
+            prior_queries = [
+                f"{item.get('name', '')}: {item.get('query', '')}"
+                for item in questions[: len(self.previous_plans)]
+                if isinstance(item, dict)
+            ]
+            context += (
+                "\n=== All Travelers' Queries ===\n"
+                + (f"{name}: {base.get('query', '')}\n" if base else "")
+                + "\n".join(prior_queries)
+                + "\n=== Previous Plan ===\n"
+                + "\n\n".join(([base_plan] if base_plan else []) + self.previous_plans)
+                + "\n=== Judgement ===\n"
+                + "\n\n".join(self.previous_feedback)
+                + "\n=== New Traveler ===\n"
+            )
+        return context
+
     def feedback(self, evidence: EnvironmentEvidence) -> dict[str, JsonValue]:
         return {"submitted": True, "judgement": evidence.info.get("judgement", "")}
+
+    def memory_entry(self, evidence: EnvironmentEvidence) -> str | None:
+        if self.task.data.get("execution_flow") != "official_travel" or self.history_mode != "memory_on":
+            return None
+        answer = evidence.arguments.get("answer")
+        round_index = evidence.info.get("history_rounds")
+        if not isinstance(answer, str) or not isinstance(round_index, int):
+            return None
+        questions = self.task.data.get("questions")
+        if not isinstance(questions, list) or not 0 <= round_index < len(questions):
+            return None
+        question = questions[round_index]
+        if not isinstance(question, dict):
+            return None
+        return json.dumps(
+            {
+                "name": question.get("name", ""),
+                "query": question.get("query", ""),
+                "scratchpad": "",
+                "final_plan": answer,
+                **(
+                    {"judgement": evidence.info["judgement"]}
+                    if isinstance(evidence.info.get("judgement"), str)
+                    else {}
+                ),
+            },
+            ensure_ascii=False,
+        )
 
     def reset_seed(self) -> int:
         return int(self.task.data["sample_id"])
@@ -107,7 +193,36 @@ class TravelScenario(ArenaScenario):
             name=str(self.task.data["questions"][index]["name"]),
             judgement_mode=str(self.task.data.get("judgement_mode", "none")),
         )
-        return client.step(answer, ground_truth=reference, need_judge=True)
+        evidence = client.step(answer, ground_truth=reference, need_judge=True)
+        if self.task.data.get("execution_flow") == "official_travel":
+            evidence.info["history_mode"] = self.history_mode
+            evidence.info["history_rounds"] = self.history_rounds
+            self.previous_plans.append(answer)
+            feedback = evidence.info.get("judgement")
+            if isinstance(feedback, str) and feedback:
+                self.previous_feedback.append(feedback)
+        return evidence
+
+
+def _format_travel_plan(name: str, days: JsonValue) -> str:
+    lines = [f"=== {name}'s Plan ==="]
+    if isinstance(days, list):
+        for day in days:
+            if not isinstance(day, dict):
+                continue
+            lines.append(f"Day {day.get('days') or day.get('day')}:")
+            for slot in (
+                "current_city",
+                "transportation",
+                "breakfast",
+                "attraction",
+                "lunch",
+                "dinner",
+                "accommodation",
+            ):
+                lines.append(f"{slot.replace('_', ' ').title()}: {day.get(slot, '-')}")
+            lines.append("")
+    return "\n".join(lines)
 
 
 class SearchScenario(ArenaScenario):
@@ -179,6 +294,20 @@ class ShoppingScenario(ArenaScenario):
     def submit(self, client: ArenaClient, session: SessionSpec, answer: str) -> EnvironmentEvidence:
         evidence = client.observation()
         evidence.info["episode_scope"] = "session"
+        purchases = evidence.observation.get("purchases")
+        if isinstance(purchases, list):
+            products: list[JsonValue] = []
+            for purchase in purchases:
+                if not isinstance(purchase, dict) or not isinstance(purchase.get("asin"), str):
+                    continue
+                asin = str(purchase["asin"]).upper()
+                try:
+                    name = client.shopping_product(asin)
+                except (RuntimeError, ValueError) as exc:
+                    evidence.info["attribute_lookup_error"] = type(exc).__name__
+                    name = None
+                products.append({"asin": asin, "name": name, "price": purchase.get("price")})
+            evidence.info["purchased_products"] = products
         return evidence
 
 

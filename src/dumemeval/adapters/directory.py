@@ -33,6 +33,8 @@ class DirectoryMemoryAdapter(BaseMemoryAdapter):
     """目录型 memory 后端。"""
 
     type_name = "directory"
+    supports_initial_memory = True
+    supports_host_history = True
 
     def __init__(self, spec: MemorySpec) -> None:
         super().__init__(spec)
@@ -53,6 +55,20 @@ class DirectoryMemoryAdapter(BaseMemoryAdapter):
         self._ops.clear()
         self._observed.clear()
         self._record("setup", 0)
+
+    def seed_history(self, task: EvalTask) -> None:
+        """Place host-provided initial memory before the first isolated session."""
+        seed = task.data.get("initial_memory")
+        if not isinstance(seed, str) or not seed:
+            return
+        path = self.memory_dir / "initial_context.json"
+        path.write_text(seed, encoding="utf-8")
+        self._record("add", 0, content=seed)
+
+    def append_history(self, session: SessionSpec, entry: str) -> None:
+        path = self.memory_dir / f"official_history_round_{session.id}.json"
+        path.write_text(entry, encoding="utf-8")
+        self._record("add", session.id, content=entry)
 
     def inject(self, session: SessionSpec, session_ctx: dict[str, Any]) -> None:
         """把 memory 目录声明为 agent 环境内的挂载。

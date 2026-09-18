@@ -156,7 +156,7 @@ def test_search_rejects_invalid_submission_evidence(status: str) -> None:
 def test_travel_reports_custom_flow_and_derived_metrics(truncated: bool) -> None:
     adapter = MemoryArenaTravelAdapter()
     task = adapter.build_tasks(
-        adapter.data_type.from_raw(raw_case("travel")), max_questions=1 if truncated else None
+        adapter.data_type.from_raw(raw_case("travel")), max_questions=1 if truncated else None, flow="custom"
     )[0]
     assert task.data["execution_flow"] == "custom_independent_sessions"
     assert task.data["official_history_compatible"] is False

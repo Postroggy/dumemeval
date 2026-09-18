@@ -347,8 +347,31 @@ if ($LASTEXITCODE -ne 0) { throw 'Run failed; inspect its artifacts' }
 ```
 
 每个通用模板默认选择一条完整源数据。通用 on/off 会额外改变记忆指令后缀；提示词完全相同的受控实验使用第 4 节。
-Travel 模板运行的是自定义独立会话流程，其 on/off 和七槽位派生指标不能作为官方 Travel 对照或
-PS/SPS/SR；Shopping 不计算商品 attribute scoring。各场景评分边界见[接入说明](README.md#scenarios)。
+Travel 默认使用官方历史控制路径：on 需要目录记忆并逐轮保存宿主捕获的提交与反馈，
+off 使用 `test_only` 协议，仍在每轮指令中获得官方累计计划和反馈；完整组才报告 PS/SPS/SR。
+Shopping 按官方目录名称报告实际购买商品的属性字符串匹配比例；查找成功但无名称时计零，目录查找失败时标为未测。
+各场景评分边界见[接入说明](README.md#scenarios)。
+
+复跑 Travel 官方历史控制的两个分支时，在完成本节资源准备后分别运行：
+
+```powershell
+$env:MEMORYARENA_ARM = 'on'
+$env:MEMORYARENA_PROTOCOL = 'memory_session_transfer'
+$env:MEMORYARENA_MEMORY_TYPE = 'directory'
+& $python -m dumemeval run --config configs/memoryarena/travel.yaml --no-resume
+if ($LASTEXITCODE -ne 0) { throw 'Travel on run failed' }
+
+$env:MEMORYARENA_ARM = 'off'
+$env:MEMORYARENA_PROTOCOL = 'test_only'
+$env:MEMORYARENA_MEMORY_TYPE = 'none'
+& $python -m dumemeval run --config configs/memoryarena/travel.yaml --no-resume
+if ($LASTEXITCODE -ne 0) { throw 'Travel off run failed' }
+
+& $python -m dumemeval compare results/memoryarena/travel/off results/memoryarena/travel/on --baseline off --output results/memoryarena/travel/comparison
+```
+
+比较器会如实标出两臂不同的提示词指纹：官方 Travel 的 off 分支显式携带累计历史，
+on 分支从记忆检索。检查两边的 `history_mode`、完整组评分和其余控制指纹后再解释差值。
 新实验应使用新的输出目录；`--no-resume` 不会删除评分检查点。
 `prepare` 核验官方 revision、资源和实际 worker SDK，成功不等于模型认证或 Docker 已就绪。
 Math/Phys 所选 backend 还需要对应 SDK：OpenAI/OpenRouter 为 openai，Anthropic 为 anthropic，Gemini/Google 为 google-genai。

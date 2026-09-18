@@ -40,6 +40,11 @@ class ShoppingTaskRequest(BaseModel):
     step_index: int | None = Field(default=None, ge=0)
 
 
+class ShoppingProductRequest(BaseModel):
+    task_id: str
+    asin: str
+
+
 def configure_factory(factory: Callable[..., Any]) -> Callable[..., Any]:
     """Configure a newly constructed SDK client before publishing the environment."""
 
@@ -98,11 +103,24 @@ def main() -> None:
         Path(request.output_path).write_text(json.dumps(task), encoding="utf-8")
         return {"status": "ok", "task_id": request.task_id}
 
+    def shopping_product(request: ShoppingProductRequest) -> dict[str, Any]:
+        entry = official.ENVIRONMENTS.get(request.task_id)
+        if entry is None or entry["env_name"] != "webshop":
+            raise HTTPException(404, "WebShop environment not initialized")
+        module = importlib.import_module("env.env_systems.web_shopping_env.runtime.reward_helpers")
+        catalog = module.load_catalog(Path(entry["env"].product_catalog_dir))
+        return {
+            "status": "ok",
+            "task_id": request.task_id,
+            "name": catalog.name_by_asin.get(request.asin.upper()),
+        }
+
     # Explicit registration preserves handler types when the optional FastAPI
     # package is absent from the host's strict-mypy environment.
     app.add_api_route("/env/tools", tools, methods=["POST"])
     app.add_api_route("/env/tool", tool, methods=["POST"])
     app.add_api_route("/env/shopping_task", shopping_task, methods=["POST"])
+    app.add_api_route("/env/shopping_product", shopping_product, methods=["POST"])
     serve(app, control_output, sdk_retry_policy="factory llm_backend SDK clients: max_retries=0")
 
 

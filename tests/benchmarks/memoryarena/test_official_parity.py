@@ -28,6 +28,7 @@ from dumemeval.benchmarks.memoryarena.metrics.travel import (
     parse_person_plan,
     slot_similarity,
 )
+from dumemeval.benchmarks.memoryarena.metrics.travel_official import OFFICIAL_SLOTS, person_result
 from dumemeval.verifier.parsers import parse_judge_response
 
 COMMIT = "6cd9de14b71915e39ac742a20dc33785e14b6aab"
@@ -226,6 +227,47 @@ def test_shopping_exact_purchase_rule_matches_official(official_root: Path, purc
     last.info["episode_scope"] = "session"
     result = MemoryArenaShoppingCalculator().calculate(inp)
     assert result.details[-1]["match_ground_truth"] == official["match_ground_truth"]
+
+
+def test_travel_offline_person_and_constraint_rules_match_official(official_root: Path) -> None:
+    path = official_root / "env/env_systems/travel_planner_env/eval.py"
+    official = definitions(
+        path,
+        {"similarity", "get_day", "find_constraint_slots", "check_slot_pass", "check_person_full_pass"},
+    )
+    official["SLOTS"] = list(OFFICIAL_SLOTS)
+    base = [{"days": 1, "transportation": "Bus B1"}]
+    gt = [{"days": 1, "transportation": "Train T2"}]
+    for submitted in (
+        [{"day": 1, "transportation": "Train T2"}],
+        [{"day": 1, "transportation": "Wrong"}],
+        [],
+    ):
+        expected_pass = official["check_person_full_pass"](gt, submitted)
+        constrained = official["find_constraint_slots"]({(37, 1): gt}, {37: base}, 37, 1)
+        expected_rate = (
+            sum(official["check_slot_pass"](gt, submitted, day, slot) for day, slot in constrained)
+            / len(constrained)
+            if constrained
+            else None
+        )
+        assert person_result(gt, submitted, base) == (expected_pass, expected_rate)
+
+
+def test_shopping_attribute_fallback_matches_official(official_root: Path) -> None:
+    from dumemeval.benchmarks.memoryarena.metrics.shopping import score_attributes
+
+    official = definitions(
+        official_root / "env/env_systems/web_shopping_env/runtime/reward_helpers.py",
+        {"normalize_for_match", "compute_attribute_matches"},
+    )
+    for attributes, name in [
+        (["blue/green", "wireless"], "Blue Green speaker"),
+        (["stainless-steel", "compact"], "Compact stainless steel kettle"),
+        (["red"], None),
+    ]:
+        count, matched, missing = official["compute_attribute_matches"](attributes, name)
+        assert score_attributes(attributes, name) == (count / len(attributes), matched, missing)
 
 
 @pytest.mark.parametrize(

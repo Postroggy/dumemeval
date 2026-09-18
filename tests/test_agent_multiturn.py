@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+from typing import cast
 from unittest.mock import patch
 
 import pytest
@@ -11,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import dumemeval.datasets.benchmarks  # noqa: F401
 from dumemeval.benchmarks.memoryarena.datasets.reasoning import MemoryArenaMathAdapter, MemoryArenaPhysAdapter
 from dumemeval.benchmarks.memoryarena.datasets.search import MemoryArenaSearchAdapter
+from dumemeval.benchmarks.memoryarena.datasets.travel import MemoryArenaTravelAdapter
 from dumemeval.datasets import get_benchmark
 from dumemeval.metrics import get_benchmark_calculator, outputs_from_execution
 from dumemeval.metrics.benchmarks.streammembench import token_overlap_score
@@ -133,7 +135,7 @@ class TestMemoryArenaShopping:
             for entry in ("TASK_ENV_URL", "WEBSHOP_ENV_URL", "arena_tool.py", "search[", "click["):
                 assert entry not in session.instruction
         assert task.task_environment.get("type") == "webshop"
-        assert a.metrics() == ["match_ground_truth", "overall_success"]
+        assert a.metrics() == ["match_ground_truth", "overall_success", "attribute_match_ratio"]
 
     def test_subset_and_max_questions(self) -> None:
         from dumemeval.benchmarks.memoryarena.datasets.shopping import MemoryArenaShoppingAdapter
@@ -399,7 +401,7 @@ class TestOutputsFromExecution:
     def test_travel_session_count_mismatch_no_longer_misaligns(self) -> None:
         """travel 场景：1 个 memory 注入 session + N 个问答 session，
         session 数 != question 数。这是导致旧位置切片错位的真实场景。"""
-        a = get_benchmark("memoryarena_travel")
+        a = cast(MemoryArenaTravelAdapter, get_benchmark("memoryarena_travel"))
         travel_data = [
             {
                 "id": 0,
@@ -411,7 +413,7 @@ class TestOutputsFromExecution:
                 "answers": [{"days": 1, "transportation": "Flight F1"}, {"days": 2}],
             }
         ]
-        task = a.build_tasks(a.data_type.from_raw(travel_data))[0]
+        task = a.build_tasks(a.data_type.from_raw(travel_data), flow="custom")[0]
         assert len(task.sessions) == 3  # 1 注入 + 2 问答，session 数 != question 数（2）
         execution = _execution(
             SessionOutcome(session_id=1, observation="记住了偏好", query=task.sessions[0].query),

@@ -61,6 +61,7 @@ class EnvironmentExecutor(SessionExecutor):
     async def run_session(self, session: SessionSpec, session_ctx: dict[str, Any]) -> SessionOutcome:
         if self.runtime is None:
             return await self.executor.run_session(session, session_ctx)
+        self.runtime.set_session_context(session_ctx)
         binding = await _settle(asyncio.to_thread(self.runtime.begin_session, session))
         context = dict(session_ctx)
         context["agent_env"] = {**session_ctx.get("agent_env", {}), **binding.env}
