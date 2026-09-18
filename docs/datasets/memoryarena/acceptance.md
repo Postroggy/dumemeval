@@ -15,12 +15,12 @@
 | --- | --- | --- |
 | 1 | 五场景锁定官方版本，记录入口/数据/环境/评分/许可证 | `sources.json` 固定源码 `6cd9de1`、数据 `da1a37c` 和关键文件哈希；未声明许可证如实记录；README 给出五场景契约。 |
 | 2 | 五场景走统一评测入口 | 五套场景 YAML 与已注册 adapter/provider/calculator；`test_cli.py` 验证统一入口。实际工具验证见下表，未声称五场景全量实跑。 |
-| 3 | 保留官方任务与评分语义 | 逐商品 Shopping ASIN、商品属性字符串匹配、Travel 六槽位 PS/SPS/SR、Search 最终 query、Math/Phys paper 聚合已有实现。Travel 默认支持官方 on/off 历史交付路径；Shopping LLM 属性 judge 与完整 fallback reward、Search qrel recall 尚未接入。新增 Travel 路径未记录真实模型对照结果。 |
+| 3 | 保留官方任务与评分语义 | 逐商品 Shopping ASIN 与固定上游 `compute_reward.py` 完整 reward 已接入；属性判定支持官方 LLM judge 和字符串回退。Travel 六槽位 PS/SPS/SR、默认官方 on/off 历史交付路径、Search 最终 query、Math/Phys paper 聚合已有实现。Search 不报告 qrel recall；新增 Travel 路径未记录真实模型对照结果。 |
 | 4 | 至少一个真实环境完成 Agent 交互 | Math 中 Claude Code、Hermes 的真实 Harbor on/off 各完成 2/2 会话，并调用官方 reasoning/submit。 |
 | 5 | 多轮和跨 session memory | 首轮写入、第二独立会话读取首轮快照并更新；off 无记忆挂载。原生轨迹与快照均保留。 |
 | 6 | 三类 reset 边界可验证 | 任务/商品环境作用域、全新 Harbor 会话、协议管理的目录记忆分别管理；`test_runtime.py`、`test_completion.py` 及真实轨迹覆盖。 |
 | 7 | on/off 控制与样本对齐 | 历史同一完整 Math 样本，实际用户/系统提示和 Skill 一致，9 项当时指纹一致。旧报告缺新增字段，当前自动比较标为未验证，详见下文。 |
-| 8 | 五场景 fixture / 已覆盖评分路径对照 | `tests/benchmarks/memoryarena/fixtures/`、`test_official_parity.py` 与 `test_official_travel_shopping.py`；新增 Travel 六槽位人员规则及 Shopping 属性字符串回退与固定官方源码对照。本地 HTTP 中 judge 为确定性固定样例，另有真实 Math judge 正反例。 |
+| 8 | 五场景 fixture / 已覆盖评分路径对照 | `tests/benchmarks/memoryarena/fixtures/`、`test_official_parity.py`、`test_official_travel_shopping.py` 与 `test_shopping_reward_route.py`；新增 Travel 六槽位人员规则及 Shopping 完整 reward、LLM judge/字符串回退与固定官方源码对照。本地 HTTP 中 judge 为确定性固定样例，另有真实 Math judge 正反例。 |
 | 9 | 官方分数、judge、derived metrics、状态分离 | calculator、verifier observation、TaskExecution 和报告分别保存；相关评分与完成状态测试。 |
 | 10 | 失败/超时/跳过/未测/0 分可区分 | 缺证据、执行失败、跳过 judge 和截断任务不产生官方零分；`test_completion.py`、`test_search_scoring.py`。 |
 | 11 | 重试无重复写入/动作/评分 | 投递身份与服务缓存、隔离的记忆传递目录、评分检查点；工具重试、任务失败恢复和 `test_scoring_checkpoint.py`。 |

@@ -5,7 +5,8 @@ agent 经 HTTP env server 逐步 ``search[...]`` / ``click[...]`` / ``click[Buy 
 ``info.last_purchased_asin`` 才是可打分的购买结果。本适配器把任务目标写成
 EvalTask，并把 ``task_environment`` 指到 webshop；**不把商品目录摊进 instruction**。
 
-官方指标：ASIN exact match（match_ground_truth）+ overall_success + attribute 字符串匹配。
+官方指标：ASIN exact match（match_ground_truth）、overall_success，以及通过固定上游
+compute_reward.py 计算的完整 reward；属性判定使用官方 LLM judge 或字符串 fallback。
 
 Source: https://github.com/ZexueHe/MemoryArena · Paper: https://arxiv.org/abs/2602.16313
 """
