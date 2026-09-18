@@ -1,7 +1,10 @@
 # MemoryArena 五场景接入
 
 本实现对应 [Issue #4](https://github.com/Postroggy/dumemeval/issues/4)。Shopping、Travel、Search、Math、Phys
-通过已有评测入口运行，复用官方工具及已覆盖的评分函数；各场景的流程与评分覆盖范围见下表。
+通过已有评测入口运行，复用官方工具及已覆盖的评分函数。接入五场景不等于五场景的官方指标与
+官方 on/off 实验均已实现：Travel 只报告自定义流程的派生诊断，官方 PS/SPS/SR 与官方 on/off
+仍未实现；Shopping 只覆盖购买 ASIN 与整包成功，attribute scoring 未覆盖；Search 不报告 qrel recall。
+各场景的流程与评分覆盖范围见下表。
 交付说明按设计、复现、验收三个入口合并，减少逐轮修复记录对评审的干扰。
 
 | 阅读入口 | 内容 |

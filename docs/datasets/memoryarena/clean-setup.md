@@ -347,6 +347,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Run failed; inspect its artifacts' }
 ```
 
 每个通用模板默认选择一条完整源数据。通用 on/off 会额外改变记忆指令后缀；提示词完全相同的受控实验使用第 4 节。
+Travel 模板运行的是自定义独立会话流程，其 on/off 和七槽位派生指标不能作为官方 Travel 对照或
+PS/SPS/SR；Shopping 不计算商品 attribute scoring。各场景评分边界见[接入说明](README.md#scenarios)。
 新实验应使用新的输出目录；`--no-resume` 不会删除评分检查点。
 `prepare` 核验官方 revision、资源和实际 worker SDK，成功不等于模型认证或 Docker 已就绪。
 Math/Phys 所选 backend 还需要对应 SDK：OpenAI/OpenRouter 为 openai，Anthropic 为 anthropic，Gemini/Google 为 google-genai。
