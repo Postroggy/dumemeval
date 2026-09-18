@@ -10,13 +10,16 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from pydantic import JsonValue
+
 
 class OfficialTools:
     """Keep upstream dynamic APIs confined to this integration boundary."""
 
-    def __init__(self, reference: Path, config: dict[str, Any]) -> None:
+    def __init__(self, reference: Path, config: dict[str, JsonValue], scene_families: dict[str, str]) -> None:
         self.reference = reference
         self.config = config
+        self.scene_families = scene_families
         self.travel: Any = None
         self.search: dict[str, Callable[..., Any]] = {}
         self.descriptions: list[dict[str, Any]] = []
@@ -43,7 +46,8 @@ class OfficialTools:
         return register
 
     def prepare(self, scene: str) -> list[dict[str, Any]]:
-        if scene == "travel_planner":
+        family = self.scene_families.get(scene)
+        if family == "travel":
             module = importlib.import_module("env.env_systems.travel_planner_env.tool_executor")
             if self.travel is None:
                 self.travel = module.ToolExecutor(
@@ -52,14 +56,16 @@ class OfficialTools:
                 )
             schemas = importlib.import_module("env.env_systems.travel_planner_env.tool_schemas").TOOLS
             return [item["function"] for item in schemas]
-        if scene == "browsecomp-plus":
+        if family == "search":
             if not self.search:
                 self._prepare_search()
             return self.descriptions
-        if scene in {"math", "phys"}:
+        if family == "reasoning":
             return [
                 {"name": "reasoning", "description": "Official reasoning tool; arguments: {task: string}."}
             ]
+        if family != "shopping":
+            raise ValueError(f"Unsupported official tool family for scene: {scene}")
         return [
             {
                 "name": "action",
@@ -75,6 +81,8 @@ class OfficialTools:
         parser = argparse.ArgumentParser()
         searcher_class.parse_args(parser)
         supplied = self.config.get("searcher_args", {})
+        if not isinstance(supplied, dict):
+            raise ValueError("Search searcher_args must be an object")
         known = {action.dest: action for action in parser._actions}
         for name, value in supplied.items():
             if name not in known:
@@ -89,15 +97,16 @@ class OfficialTools:
             self, searcher, self.config.get("snippet_max_tokens", 512), self.config.get("k", 5), True
         )
 
-    def call(self, scene: str, environment: Any, name: str, arguments: dict[str, Any]) -> Any:
-        self.prepare(scene)
-        if scene == "travel_planner":
-            allowed = {item["name"] for item in self.prepare(scene)}
+    def call(self, scene: str, environment: Any, name: str, arguments: dict[str, JsonValue]) -> Any:
+        catalog = self.prepare(scene)
+        family = self.scene_families[scene]
+        if family == "travel":
+            allowed = {item["name"] for item in catalog}
             if name not in allowed:
                 raise ValueError("Unknown travel tool")
             return self.travel.execute(name, arguments)
-        if scene == "browsecomp-plus" and name in self.search:
+        if family == "search" and name in self.search:
             return self.search[name](**arguments)
-        if scene in {"math", "phys"} and name == "reasoning":
+        if family == "reasoning" and name == "reasoning":
             return environment.reasoning(str(arguments["task"]))
         raise ValueError("Unknown official tool")

@@ -19,8 +19,9 @@ from dumemeval.task_environments.gateway import ToolGateway
 
 from .client import ArenaClient
 from .config import ArenaConnection, ArenaRuntimeConfig
+from .journal import EnvironmentJournal
 from .prepare import inspect_environment
-from .scenarios import SCENARIOS
+from .scenarios import scenario_type
 from .service import OfficialService
 
 
@@ -35,7 +36,8 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
             output_dir / "environments" / f"{safe_name}-{hashlib.sha256(task.name.encode()).hexdigest()[:8]}"
         )
         self.service = OfficialService(config, self.directory)
-        self.scenario = SCENARIOS[config.env_name](task, config, self.directory)
+        self.scenario = scenario_type(config.env_name)(task, config, self.directory)
+        self.journal = EnvironmentJournal(self.directory / "trace.jsonl", self.service.redactor)
         self.client: ArenaClient | None = None
         self._clients: list[ArenaClient] = []
         self.gateway: ToolGateway | None = None
@@ -155,6 +157,7 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
         if self._submitted:
             raise ValueError("This round is already submitted")
         start = time.monotonic()
+        event_count = len(self.client.events)
         evidence = EnvironmentEvidence(
             task_id=self.client.task_id,
             env_name=self.config.env_name,
@@ -165,6 +168,7 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
             tool=call.tool,
             arguments=call.arguments,
             source="official_tool",
+            status="failed",
         )
         try:
             if call.tool == "submit":
@@ -173,36 +177,33 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
                 answer = call.arguments.get("answer")
                 if not isinstance(answer, str) or not answer.strip():
                     raise ValueError("submit requires a non-empty answer")
-                evidence = self._submit(answer, evidence)
+                evidence = self._bind_evidence(
+                    self.scenario.submit(self.client, self.session, answer), evidence
+                )
                 self._submitted = True
                 result: JsonValue = self.scenario.feedback(evidence)
             else:
                 reply = self.scenario.invoke(self.client, call)
                 result = reply.result
                 if reply.evidence:
-                    evidence = reply.evidence.model_copy(
-                        update={
-                            k: getattr(evidence, k)
-                            for k in ("session_id", "action_id", "sequence", "tool", "arguments")
-                        }
-                    )
+                    evidence = self._bind_evidence(reply.evidence, evidence)
             evidence.result = result
+            evidence.status = "completed"
             return result
-        except (RuntimeError, ValueError, KeyError):
+        except Exception:
             evidence.status = (
                 "ambiguous"
-                if self.client.events and self.client.events[-1].status == "ambiguous"
+                if len(self.client.events) > event_count and self.client.events[-1].status == "ambiguous"
                 else "failed"
             )
             raise
         finally:
             evidence.elapsed_sec = time.monotonic() - start
             self.evidence.append(evidence)
-            self._write_artifacts()
+            self._append_trace()
 
-    def _submit(self, answer: str, evidence: EnvironmentEvidence) -> EnvironmentEvidence:
-        assert self.client and self.session
-        reply = self.scenario.submit(self.client, self.session, answer)
+    @staticmethod
+    def _bind_evidence(reply: EnvironmentEvidence, evidence: EnvironmentEvidence) -> EnvironmentEvidence:
         return reply.model_copy(
             update={
                 "session_id": evidence.session_id,
@@ -210,6 +211,7 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
                 "sequence": evidence.sequence,
                 "tool": evidence.tool,
                 "arguments": evidence.arguments,
+                "status": "failed",
             }
         )
 
@@ -230,12 +232,17 @@ class MemoryArenaRuntime(TaskEnvironmentRuntime):
             outcome.success = False
             outcome.error = outcome.error or "Environment tool execution failed; see environment trace"
         outcome.artifacts["environment_trace"] = self.directory / "trace.json"
+        outcome.artifacts["environment_journal"] = self.directory / "trace.jsonl"
         outcome.artifacts["environment_provenance"] = self.directory / "runtime.json"
         self.session = None
         self._write_artifacts()
         return SessionOutcome.model_validate_json(self.service.redactor.text(outcome.model_dump_json()))
 
+    def _append_trace(self) -> None:
+        self.journal.flush(self.evidence, {client.task_id: client.events for client in self._clients})
+
     def _write_artifacts(self) -> None:
+        self._append_trace()
         self.directory.mkdir(parents=True, exist_ok=True)
         trace = {
             "task_id": self.task.name,

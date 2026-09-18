@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, JsonValue
 
 from dumemeval.datasets.benchmark import BenchmarkAdapter, BenchmarkData, register_benchmark
 from dumemeval.models import EvalTask, MemoryFact, SessionSpec
@@ -35,9 +35,9 @@ class TravelSample(BaseModel):
     """MemoryArena travel 单个样本（base_person + rounds）。"""
 
     id: int = 0
-    base_person: dict[str, Any] = Field(default_factory=dict)
+    base_person: dict[str, JsonValue] = Field(default_factory=dict)
     questions: list[TravelQuestion] = Field(default_factory=list)
-    answers: list[Any] = Field(default_factory=list)
+    answers: list[JsonValue] = Field(default_factory=list)
 
 
 class MemoryArenaTravelData(BenchmarkData):
@@ -135,7 +135,8 @@ class MemoryArenaTravelAdapter(BenchmarkAdapter):
                 )
 
             facts: list[MemoryFact] = []
-            bp_query = base_person.get("query", "")
+            bp_query_raw = base_person.get("query", "")
+            bp_query = bp_query_raw if isinstance(bp_query_raw, str) else ""
             for line in bp_query.splitlines():
                 line = line.strip()
                 if line and len(line) > 5 and not line.startswith("I am"):

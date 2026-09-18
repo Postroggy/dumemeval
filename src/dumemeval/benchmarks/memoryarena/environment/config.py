@@ -4,17 +4,27 @@ Source: https://github.com/ZexueHe/MemoryArena
 """
 
 from pathlib import Path
-from typing import Literal
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field, JsonValue, field_validator
 
+from dumemeval.models.memoryarena import arena_scene
 
-class ArenaConnection(BaseModel):
+
+class SceneConfig(BaseModel):
+    env_name: str
+
+    @field_validator("env_name")
+    @classmethod
+    def validate_scene(cls, value: str) -> str:
+        arena_scene(value)
+        return value
+
+
+class ArenaConnection(SceneConfig):
     """Connection to a provisioned, pinned MemoryArena environment server."""
 
     base_url: str
-    env_name: Literal["webshop", "travel_planner", "browsecomp-plus", "math", "phys"]
     timeout_sec: float = Field(default=30, gt=0)
     env_config: dict[str, JsonValue] = Field(default_factory=dict)
 
@@ -29,12 +39,11 @@ class ArenaConnection(BaseModel):
         return value.rstrip("/")
 
 
-class ArenaRuntimeConfig(BaseModel):
+class ArenaRuntimeConfig(SceneConfig):
     """Pinned official implementation and explicitly provisioned runtime inputs."""
 
     reference: Path
     revision: str = "6cd9de14b71915e39ac742a20dc33785e14b6aab"
-    env_name: Literal["webshop", "travel_planner", "browsecomp-plus", "math", "phys"]
     python: str | None = None
     seed: int = 0
     timeout_sec: float = Field(default=120, gt=0)

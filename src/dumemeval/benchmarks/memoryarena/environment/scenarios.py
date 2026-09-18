@@ -10,6 +10,7 @@ from pydantic import BaseModel, JsonValue, TypeAdapter
 
 from dumemeval.models import EvalTask, SessionSpec
 from dumemeval.models.environment import EnvironmentEvidence, ToolCall
+from dumemeval.models.memoryarena import SceneFamily, arena_scene
 
 from .client import ArenaClient
 from .config import ArenaRuntimeConfig
@@ -185,10 +186,13 @@ class ShoppingScenario(ArenaScenario):
         self.upstream.close()
 
 
-SCENARIOS: dict[str, type[ArenaScenario]] = {
-    "webshop": ShoppingScenario,
-    "travel_planner": TravelScenario,
-    "browsecomp-plus": SearchScenario,
-    "math": ReasoningScenario,
-    "phys": ReasoningScenario,
+SCENARIOS: dict[SceneFamily, type[ArenaScenario]] = {
+    "shopping": ShoppingScenario,
+    "travel": TravelScenario,
+    "search": SearchScenario,
+    "reasoning": ReasoningScenario,
 }
+
+
+def scenario_type(name: str) -> type[ArenaScenario]:
+    return SCENARIOS[arena_scene(name).family]

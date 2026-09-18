@@ -18,18 +18,24 @@ from fastapi import FastAPI, HTTPException
 
 # Only load the sibling boundary; the worker need not install the framework.
 from official_tools import OfficialTools
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, JsonValue
+
+
+class WorkerConfig(BaseModel):
+    tools_config: dict[str, JsonValue]
+    scene_families: dict[str, str]
+    scene_factories: dict[str, str]
 
 
 class ToolRequest(BaseModel):
     task_id: str
     tool: str = ""
-    arguments: dict[str, Any] = Field(default_factory=dict)
+    arguments: dict[str, JsonValue] = Field(default_factory=dict)
 
 
 class ShoppingTaskRequest(BaseModel):
     task_id: str
-    row: dict[str, Any]
+    row: dict[str, JsonValue]
     output_path: str
     step_index: int | None = Field(default=None, ge=0)
 
@@ -49,7 +55,7 @@ def configure_factory(factory: Callable[..., Any]) -> Callable[..., Any]:
 
 def main() -> None:
     reference = Path(sys.argv[1]).resolve()
-    tools_config = json.loads(sys.stdin.readline())
+    config = WorkerConfig.model_validate_json(sys.stdin.readline())
     control_output = sys.stdout
     sys.stdout = sys.stderr  # Upstream diagnostic prints cannot corrupt the readiness channel.
     sys.path.insert(0, str(reference))
@@ -60,7 +66,11 @@ def main() -> None:
     official = importlib.import_module("env.env_server")
     for name, factory in list(official.ENV_FACTORIES.items()):
         official.ENV_FACTORIES[name] = configure_factory(factory)
-    catalog = OfficialTools(reference, tools_config)
+    for name, original in config.scene_factories.items():
+        if original not in official.ENV_FACTORIES:
+            raise ValueError(f"Official environment factory unavailable: {original}")
+        official.ENV_FACTORIES[name] = official.ENV_FACTORIES[original]
+    catalog = OfficialTools(reference, config.tools_config, config.scene_families)
     app: FastAPI = official.app
 
     @app.post("/env/tools")

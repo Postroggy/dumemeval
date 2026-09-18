@@ -14,6 +14,7 @@ from pathlib import Path
 from pydantic import JsonValue
 
 from dumemeval.artifacts.redaction import Redactor
+from dumemeval.models.memoryarena import ARENA_SCENES
 
 from .config import ArenaRuntimeConfig
 
@@ -76,10 +77,21 @@ class OfficialService:
             text=True,
             encoding="utf-8",
             env=environment,
-            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         assert self.process.stdin and self.process.stdout and self.process.stderr
-        self.process.stdin.write(json.dumps(self.config.tools_config) + "\n")
+        self.process.stdin.write(
+            json.dumps(
+                {
+                    "tools_config": self.config.tools_config,
+                    "scene_families": {name: scene.family for name, scene in ARENA_SCENES.items()},
+                    "scene_factories": {
+                        self.config.env_name: ARENA_SCENES[self.config.env_name].official_name
+                    },
+                }
+            )
+            + "\n"
+        )
         self.process.stdin.flush()
         self.process.stdin.close()
         ready: queue.Queue[str] = queue.Queue()

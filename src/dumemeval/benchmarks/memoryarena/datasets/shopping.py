@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, JsonValue
 
 from dumemeval.datasets.benchmark import BenchmarkAdapter, BenchmarkData, register_benchmark
 from dumemeval.datasets.benchmarks._common import query_text
@@ -25,8 +25,8 @@ from ._validation import take, validate_ids, validate_rounds
 
 class ShoppingSample(BaseModel):
     id: int = 0
-    questions: list[Any] = Field(default_factory=list)
-    answers: list[Any] = Field(default_factory=list)
+    questions: list[JsonValue] = Field(default_factory=list)
+    answers: list[JsonValue] = Field(default_factory=list)
     category: str = ""
 
 

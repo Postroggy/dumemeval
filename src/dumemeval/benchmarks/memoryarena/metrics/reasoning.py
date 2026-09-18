@@ -20,6 +20,7 @@ from typing import Any, ClassVar
 from dumemeval.metrics.core.base import MetricBundle, MetricCalculator, MetricInput, MetricKind, round_items
 from dumemeval.metrics.core.registry import JudgeFn
 from dumemeval.models import BenchmarkResult
+from dumemeval.models.memoryarena import ARENA_SCENES
 
 from .reasoning_aggregation import aggregate_papers
 
@@ -67,7 +68,14 @@ class MemoryArenaReasoningCalculator(MetricCalculator):
             evidence = outcome.environment if outcome else None
             raw_judge = None
             status = "measured"
-            if evidence and evidence.env_name in {"math", "phys"} and evidence.reward is not None:
+            scene = ARENA_SCENES.get(evidence.env_name) if evidence else None
+            if (
+                evidence
+                and scene
+                and scene.family == "reasoning"
+                and evidence.status == "completed"
+                and evidence.reward is not None
+            ):
                 correct = bool(evidence.reward)
                 raw_judge = evidence.observation.get("judge_result")
             elif inp.task.task_environment.get("type") == "memoryarena" or (outcome and not outcome.success):

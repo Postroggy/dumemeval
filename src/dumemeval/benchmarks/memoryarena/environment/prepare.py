@@ -11,6 +11,7 @@ from pathlib import Path
 
 from pydantic import Field
 
+from dumemeval.models.memoryarena import arena_scene
 from dumemeval.task_environments.base import EnvironmentPreparation
 
 from .config import ArenaRuntimeConfig
@@ -43,7 +44,8 @@ def _uses_tokenizer(config: ArenaRuntimeConfig) -> bool:
 
 
 def required_assets(config: ArenaRuntimeConfig) -> list[str]:
-    if config.env_name == "travel_planner":
+    family = arena_scene(config.env_name).family
+    if family == "travel":
         root = Path(
             str(
                 config.tools_config.get("database")
@@ -61,7 +63,7 @@ def required_assets(config: ArenaRuntimeConfig) -> list[str]:
                 "background/citySet_with_states.txt",
             )
         ]
-    if config.env_name == "webshop":
+    if family == "shopping":
         root = Path(
             config.service_env.get("MEMORYARENA_WEBSHOP_DATA_ROOT", str(config.reference / "data/shopping"))
         )
@@ -77,7 +79,7 @@ def required_assets(config: ArenaRuntimeConfig) -> list[str]:
                 )
             ],
         ]
-    if config.env_name == "browsecomp-plus":
+    if family == "search":
         args = config.tools_config.get("searcher_args")
         if not isinstance(args, dict):
             return ["Search requires tools_config.searcher_args"]
@@ -134,7 +136,8 @@ def inspect_environment(config: ArenaRuntimeConfig, *, clone: bool = False) -> P
         for path in sorted(files):
             report.assets[str(path.resolve())] = checksum(path)
     modules = ["fastapi", "uvicorn", "anthropic", "datasets"]
-    if config.env_name in {"math", "phys"}:
+    family = arena_scene(config.env_name).family
+    if family == "reasoning":
         backend = str(config.env_config.get("backend", "openai")).lower()
         sdk = {
             "openai": "openai",
@@ -147,9 +150,9 @@ def inspect_environment(config: ArenaRuntimeConfig, *, clone: bool = False) -> P
             report.missing.append(f"Unsupported Math/Phys backend: {backend}")
         elif sdk not in modules:
             modules.append(sdk)
-    if config.env_name == "webshop":
+    if family == "shopping":
         modules += ["gym", "spacy", "en_core_web_lg", "pyserini", "bs4"]
-    if config.env_name == "browsecomp-plus":
+    if family == "search":
         modules += ["faiss", "fastmcp", "transformers", "torch", "tevatron"]
         if config.tools_config.get("searcher_type") == "bm25":
             modules += ["pyserini"]
