@@ -242,6 +242,8 @@ class TestMemoryArenaShopping:
         )
         task = a.build_tasks(data)[0]
         assert task.task_environment.get("type") == "webshop"
-        assert "search[" in task.sessions[0].instruction
-        assert "click[Buy Now]" in task.sessions[0].instruction
+        # The task template describes the goal and evidence boundary. The selected
+        # environment provider supplies action syntax through its runtime hint.
+        assert "Buy cake mix" in task.sessions[0].instruction
+        assert "通过任务环境提供的工具" in task.sessions[0].instruction
         assert "不要编造 ASIN" in task.sessions[0].instruction
