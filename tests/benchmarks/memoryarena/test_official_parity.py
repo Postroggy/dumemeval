@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import ast
 import difflib
+import importlib
 import json
 import logging
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -268,6 +270,64 @@ def test_shopping_attribute_fallback_matches_official(official_root: Path) -> No
     ]:
         count, matched, missing = official["compute_attribute_matches"](attributes, name)
         assert score_attributes(attributes, name) == (count / len(attributes), matched, missing)
+
+
+def test_shopping_official_full_reward_and_llm_judge_paths(
+    official_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.syspath_prepend(str(official_root))
+    reward_module = importlib.import_module("env.env_systems.web_shopping_env.compute_reward")
+    helpers = importlib.import_module("env.env_systems.web_shopping_env.runtime.reward_helpers")
+    catalog = helpers.CatalogLookup(
+        category_by_asin={"TARGET": "audio", "PURCHASED": "audio"},
+        name_by_asin={"TARGET": "Blue Speaker", "PURCHASED": "Blue Speaker"},
+    )
+    step = {"step": 1, "target_asin": "TARGET", "purchased_asin": "PURCHASED", "purchased_price": 80.0}
+    gold = {"requirements": {"attributes": ["wireless"], "price_constraints": {"price_upper": 100}}}
+    fallback = reward_module.compute_reward_for_step(step, gold, catalog)
+    assert fallback["components"]["attr_match_ratio"] == 0.0
+    assert fallback["components"]["r_price"] == 1.0
+    assert fallback["reward"] == pytest.approx(0.5)
+
+    response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(content='{"matches":[{"attribute":"wireless","has_attribute":true}]}')
+            )
+        ]
+    )
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **_kwargs: response))
+    )
+    judge = reward_module.AttributeJudge(client, "fake-judge", max_retries=1, retry_delay=0)
+    judged = reward_module.compute_reward_for_step(step, gold, catalog, attribute_judge=judge)
+    assert judged["components"]["attribute_judge"]["used_llm"] is True
+    assert judged["components"]["attr_match_ratio"] == 1.0
+    assert judged["reward"] == 1.0
+    exact = reward_module.compute_reward_for_step(
+        {**step, "purchased_asin": "TARGET", "purchased_price": 150.0}, gold, catalog
+    )
+    assert exact["reward"] == 1.0
+    assert exact["calculation"]["reward_reason"] == "asin_match"
+    missing_purchase = reward_module.compute_reward_for_step(
+        {**step, "purchased_asin": None, "purchased_price": None}, gold, catalog
+    )
+    assert missing_purchase["reward"] == 0.0
+    assert missing_purchase["calculation"]["reward_reason"] == "no_purchase"
+    task_files = importlib.import_module("env.env_systems.web_shopping_env.runtime.runner.task_files")
+    hf_row = {
+        "id": 1,
+        "questions": ["Rules\nProduct 1:\nBuy a wireless speaker"],
+        "answers": [{"target_asin": "TARGET", "attributes": ["wireless"]}],
+        "category": "audio",
+    }
+    official_step = task_files._reconstruct_task_def_from_hf_row(hf_row)["steps"][0]
+    assert official_step["requirements"]["attributes"] == ["wireless"]
+    hf_reward = reward_module.compute_reward_for_step(step, official_step, catalog, attribute_judge=judge)
+    assert hf_reward["components"]["attribute_judge"]["used_llm"] is True
+    assert hf_reward["components"]["attr_match_ratio"] == 1.0
+    assert hf_reward["reward"] == 1.0
+    sys.modules.pop("env.env_systems.web_shopping_env.compute_reward", None)
 
 
 @pytest.mark.parametrize(

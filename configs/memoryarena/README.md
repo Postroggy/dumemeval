@@ -18,6 +18,8 @@
 `ANTHROPIC_BASE_URL`；外部资源与 worker 的变量按运行指南设置。
 通用 on/off 会改变记忆提示后缀，严格同提示对照使用 `controlled-math*.yaml`。
 Travel 的默认流程按官方六槽位报告 PS/SPS/SR；on 用目录记忆和 `memory_session_transfer`，
-off 用 `test_only`，环境仍提供累计计划与反馈。Shopping 属性分使用官方商品目录中的购买商品名称，
-仅覆盖字符串匹配回退规则。
+off 用 `test_only`，环境仍提供累计计划与反馈。Shopping 通过固定上游 `compute_reward.py` 报告
+完整 reward；`MEMORYARENA_SHOPPING_ATTRIBUTE_MODE=auto|llm|string` 控制属性判定，默认 `auto`
+在 worker 有 OpenAI/Azure 凭据时用 LLM，否则按官方字符串回退。模型可用
+`MEMORYARENA_SHOPPING_ATTRIBUTE_MODEL` 指定，默认 `gpt-4o`。
 新实验使用新输出目录，`--no-resume` 不会移除评分检查点；缺失证据或跳过评分保持未测。

@@ -65,15 +65,16 @@ on/off 历史路径与 Shopping 属性字符串评分；以下新增验证以本
 - Search 受管最终评分要求本轮成功检索证据；没有证据时不调用 judge。answer-only 结果为派生诊断。
 - Travel 增加默认官方历史控制路径与六槽位 PS/SPS/SR；旧七槽位诊断仅在显式 custom flow 下使用。新路径已有固定样例和官方源码对照，尚未做真实模型 on/off 实验。
 - 评分范围贯穿 JSON、Markdown、Utility 与比较；派生值不再进入 `official_task_score`，不能混入官方聚合。
-- Shopping backend 由 runtime 统一管理，版本/依赖参与稳定指纹，端口/清理结果记录于 provenance；新增官方商品目录名称的属性字符串匹配。查找成功但无名称时计零，查找失败时未测。
+- Shopping backend 由 runtime 统一管理，版本/依赖参与稳定指纹，端口/清理结果记录于 provenance；固定上游完整 reward 在受管 worker 中计算，`auto` 模式在 LLM judge 无法建立时保留完整字符串回退 reward，目录加载在任务进程内缓存。
 - 资源脚本纳入 `make ci` 的 Ruff/mypy 范围，补充离线 manifest 测试；Source 扫描覆盖整个 `src/dumemeval`。
 
 本轮不重新执行付费模型实验，不改变原始真实运行证据。Linux `make ci` 以当前 PR Checks 为准，
 Windows 检查不能替代 Linux 门禁。
 
-当前 Windows / Python 3.12.11：`PYTHONUTF8=1` 的全仓非 e2e 测试为 766 通过、3 失败、61 跳过；
-3 项为下节已复现的 Windows 路径/权限断言。MemoryArena 专项为 231 通过、44 跳过；
-新增 Travel/Shopping 两项固定官方源码对照通过。Ruff、格式、strict mypy（239 文件）与 wheel/sdist 构建通过。
+当前 Windows / Python 3.12.11：`PYTHONUTF8=1` 的全仓非 e2e 测试在排除下节已复现的 3 项
+Windows 路径/权限断言后为 771 通过、61 跳过。MemoryArena 专项为 236 通过、44 跳过；
+新增 Travel、Shopping 属性与完整 reward/LLM 路径的固定官方源码对照通过。
+Ruff、格式、strict mypy（240 文件）、wheel/sdist 构建及四臂 mock smoke 通过。
 
 ## 历史代码检查与上游基线（1a132d0）
 
@@ -116,7 +117,7 @@ GitHub 的 Linux 检查执行仓库统一 `make ci`，状态以 PR Checks 为准
 - 未运行五场景全量数据，未证明正向或统计显著的记忆收益；真实模型结果不代表后续修复代码的重新实跑。
 - 两组保持配置及采样设置一致，未声称模型服务提供全局确定性随机种子。
 - Shopping 上游按系统时间初始化的随机性未控制，已写入 provenance；Math 对照不使用 Shopping 环境。
-- Travel 新增的官方 on/off 路径和 Shopping 属性评分只有确定性样例与源码对照，尚无本次提交的真实 Agent 运行结果；Travel on 历史中的官方 Agent 内部 scratchpad 无法由宿主获取，当前为空。Shopping 的上游 LLM 属性 judge 与完整 fallback reward 仍未覆盖。
+- Travel 新增的官方 on/off 路径和尚未实跑的 Shopping LLM/完整 reward 路径只有确定性样例与固定上游源码对照，尚无本次提交的真实 Agent 运行结果；Travel on 历史中的官方 Agent 内部 scratchpad 无法由宿主获取，当前为空。
 - Search 多数票是可选扩展，不报告 qrel recall；官方依赖与兼容 worker 的差异已记录。
 - Hermes 的 Harbor ATIF 未携带会话级 token 统计；框架 token/cost=0 表示未测，原生用量另存，费用未知。
 - 记忆观测是下界：Claude 结构化 Read 可自动计数，Hermes 使用原生读取证据；任意 shell 读取或写后恢复原内容可能无法计数。

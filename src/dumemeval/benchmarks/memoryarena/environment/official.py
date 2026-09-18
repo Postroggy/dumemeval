@@ -12,7 +12,7 @@ import sys
 from collections.abc import Callable
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
 
@@ -43,6 +43,14 @@ class ShoppingTaskRequest(BaseModel):
 class ShoppingProductRequest(BaseModel):
     task_id: str
     asin: str
+
+
+class ShoppingRewardRequest(BaseModel):
+    task_id: str
+    step_result: dict[str, JsonValue]
+    ground_truth: dict[str, JsonValue]
+    attribute_mode: Literal["auto", "llm", "string"] = "auto"
+    attribute_model: str = "gpt-4o"
 
 
 def configure_factory(factory: Callable[..., Any]) -> Callable[..., Any]:
@@ -77,6 +85,17 @@ def main() -> None:
         official.ENV_FACTORIES[name] = official.ENV_FACTORIES[original]
     catalog = OfficialTools(reference, config.tools_config, config.scene_families)
     app: FastAPI = official.app
+    attribute_judges: dict[str, Any] = {}
+    shopping_catalogs: dict[Path, Any] = {}
+
+    def shopping_catalog(entry: dict[str, Any]) -> Any:
+        catalog_dir = Path(entry["env"].product_catalog_dir).resolve()
+        product_catalog = shopping_catalogs.get(catalog_dir)
+        if product_catalog is None:
+            helpers = importlib.import_module("env.env_systems.web_shopping_env.runtime.reward_helpers")
+            product_catalog = helpers.load_catalog(catalog_dir)
+            shopping_catalogs[catalog_dir] = product_catalog
+        return product_catalog
 
     def tools(request: ToolRequest) -> dict[str, Any]:
         entry = official.ENVIRONMENTS.get(request.task_id)
@@ -107,12 +126,51 @@ def main() -> None:
         entry = official.ENVIRONMENTS.get(request.task_id)
         if entry is None or entry["env_name"] != "webshop":
             raise HTTPException(404, "WebShop environment not initialized")
-        module = importlib.import_module("env.env_systems.web_shopping_env.runtime.reward_helpers")
-        catalog = module.load_catalog(Path(entry["env"].product_catalog_dir))
+        product_catalog = shopping_catalog(entry)
         return {
             "status": "ok",
             "task_id": request.task_id,
-            "name": catalog.name_by_asin.get(request.asin.upper()),
+            "name": product_catalog.name_by_asin.get(request.asin.upper()),
+        }
+
+    def shopping_reward(request: ShoppingRewardRequest) -> dict[str, Any]:
+        entry = official.ENVIRONMENTS.get(request.task_id)
+        if entry is None or entry["env_name"] != "webshop":
+            raise HTTPException(404, "WebShop environment not initialized")
+        reward_module = importlib.import_module("env.env_systems.web_shopping_env.compute_reward")
+        product_catalog = shopping_catalog(entry)
+        mode = request.attribute_mode
+        judge = None
+        fallback_reason = None
+        if mode in {"auto", "llm"}:
+            judge = attribute_judges.get(request.attribute_model)
+            if judge is None:
+                try:
+                    judge = reward_module.create_attribute_judge(
+                        reference / ".env", request.attribute_model, 3, 1.5
+                    )
+                except Exception as exc:
+                    # Upstream auto mode falls back to string reward whenever
+                    # optional judge initialization fails, including SDK errors.
+                    if mode == "llm":
+                        raise
+                    fallback_reason = type(exc).__name__
+                else:
+                    attribute_judges[request.attribute_model] = judge
+            mode = "llm" if judge is not None else "string"
+        reward = reward_module.compute_reward_for_step(
+            request.step_result,
+            request.ground_truth,
+            product_catalog,
+            attribute_judge=judge,
+            judge_context={"task_id": request.task_id, "step": request.step_result.get("step")},
+        )
+        return {
+            "status": "ok",
+            "task_id": request.task_id,
+            "attribute_mode": mode,
+            "attribute_fallback_reason": fallback_reason,
+            "reward": reward,
         }
 
     # Explicit registration preserves handler types when the optional FastAPI
@@ -121,6 +179,7 @@ def main() -> None:
     app.add_api_route("/env/tool", tool, methods=["POST"])
     app.add_api_route("/env/shopping_task", shopping_task, methods=["POST"])
     app.add_api_route("/env/shopping_product", shopping_product, methods=["POST"])
+    app.add_api_route("/env/shopping_reward", shopping_reward, methods=["POST"])
     serve(app, control_output, sdk_retry_policy="factory llm_backend SDK clients: max_retries=0")
 
 

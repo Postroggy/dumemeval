@@ -4,6 +4,7 @@ Source: https://github.com/ZexueHe/MemoryArena
 """
 
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field, JsonValue, field_validator
@@ -54,3 +55,5 @@ class ArenaRuntimeConfig(SceneConfig):
     env_config: dict[str, JsonValue] = Field(default_factory=dict)
     tools_config: dict[str, JsonValue] = Field(default_factory=dict)
     service_env: dict[str, str] = Field(default_factory=dict)
+    shopping_attribute_mode: Literal["auto", "llm", "string"] = "auto"
+    shopping_attribute_model: str = "gpt-4o"

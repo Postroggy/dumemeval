@@ -214,5 +214,7 @@ class TestAggregator:
             "match_ground_truth",
             "overall_success",
             "attribute_match_ratio",
+            "average_reward",
+            "reward_item_success",
         ]
         assert declared_metric_names("nope") == []

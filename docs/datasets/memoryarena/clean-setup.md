@@ -349,7 +349,18 @@ if ($LASTEXITCODE -ne 0) { throw 'Run failed; inspect its artifacts' }
 每个通用模板默认选择一条完整源数据。通用 on/off 会额外改变记忆指令后缀；提示词完全相同的受控实验使用第 4 节。
 Travel 默认使用官方历史控制路径：on 需要目录记忆并逐轮保存宿主捕获的提交与反馈，
 off 使用 `test_only` 协议，仍在每轮指令中获得官方累计计划和反馈；完整组才报告 PS/SPS/SR。
-Shopping 按官方目录名称报告实际购买商品的属性字符串匹配比例；查找成功但无名称时计零，目录查找失败时标为未测。
+Shopping 在受管 worker 中调用固定上游 `compute_reward.py`，报告实际购买商品的完整 reward 与属性比例。
+默认 `auto` 在 worker 有 `OPENAI_API_KEY`（或 Azure OpenAI 凭据）时使用上游 LLM attribute judge，
+否则使用上游字符串回退；显式测试 LLM 路径可在运行 Shopping 前设置：
+
+```powershell
+$env:MEMORYARENA_SHOPPING_ATTRIBUTE_MODE = 'llm'
+$env:MEMORYARENA_SHOPPING_ATTRIBUTE_MODEL = 'gpt-4o'
+# 另设置 OPENAI_API_KEY；若使用代理，也设置 OPENAI_BASE_URL。
+```
+
+`string` 模式不调用属性模型。缺少官方 reward 证据时 `average_reward` 保持未测；
+查找成功但目录无商品名称时属性计零；若 reward 调用失败且无法解析商品名称，属性指标未测。
 各场景评分边界见[接入说明](README.md#scenarios)。
 
 复跑 Travel 官方历史控制的两个分支时，在完成本节资源准备后分别运行：

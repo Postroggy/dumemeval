@@ -135,7 +135,13 @@ class TestMemoryArenaShopping:
             for entry in ("TASK_ENV_URL", "WEBSHOP_ENV_URL", "arena_tool.py", "search[", "click["):
                 assert entry not in session.instruction
         assert task.task_environment.get("type") == "webshop"
-        assert a.metrics() == ["match_ground_truth", "overall_success", "attribute_match_ratio"]
+        assert a.metrics() == [
+            "match_ground_truth",
+            "overall_success",
+            "attribute_match_ratio",
+            "average_reward",
+            "reward_item_success",
+        ]
 
     def test_subset_and_max_questions(self) -> None:
         from dumemeval.benchmarks.memoryarena.datasets.shopping import MemoryArenaShoppingAdapter

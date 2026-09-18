@@ -2,8 +2,8 @@
 
 本实现对应 [Issue #4](https://github.com/Postroggy/dumemeval/issues/4)。Shopping、Travel、Search、Math、Phys
 通过已有评测入口运行，复用官方工具及已覆盖的评分函数。Travel 默认使用官方历史控制路径，
-按六槽位计算 PS/SPS/SR，可用目录记忆的 on 与无记忆的 off 运行对照；Shopping 增加基于
-官方商品目录名称的 attribute 字符串匹配。Search 不报告 qrel recall。
+按六槽位计算 PS/SPS/SR，可用目录记忆的 on 与无记忆的 off 运行对照；Shopping 由固定上游
+`compute_reward.py` 计算完整 reward，按配置使用 LLM attribute judge 或字符串回退。Search 不报告 qrel recall。
 这些新增路径已有固定样例和官方源码对照测试；尚无 Travel 真实模型 on/off 新运行证据。
 各场景的流程与评分覆盖范围见下表。
 交付说明按设计、复现、验收三个入口合并，减少逐轮修复记录对评审的干扰。
@@ -72,7 +72,7 @@ Shopping 任务模板只描述购买目标和真实购买约束；具体工具�
 
 | 场景 / HF 配置 | 数据、交互与任务组织 | 官方评分和差异 |
 | --- | --- | --- |
-| Shopping / `bundled_shopping` | 顺序问题/答案、商品库、lite webshop 的 search/click/购买；默认 `split_steps=true`，每商品重建环境，记忆按协议保留。 | 宿主实际购买 ASIN 与本轮目标比较；完整 bundle 才报告 overall success。按官方目录中实际购买商品名称计算 `attribute_match_ratio`（字符串回退规则）；查找成功但目录无名称时按官方回退计零，查找失败时未测。上游 LLM attribute judge 与完整 fallback reward 尚未接入，系统时间随机性未控制。 |
+| Shopping / `bundled_shopping` | 顺序问题/答案、商品库、lite webshop 的 search/click/购买；默认 `split_steps=true`，每商品重建环境，记忆按协议保留。 | 宿主实际购买 ASIN 与本轮目标比较；完整 bundle 才报告 overall success。固定上游 `compute_reward.py` 计算名称/类别、属性、价格和 ASIN 满分覆盖，报告 `attribute_match_ratio`、`average_reward` 与 `reward_item_success`；可配置 LLM attribute judge，缺凭据时使用官方字符串回退。缺少 reward 证据时相应指标保持未测；系统时间随机性未控制。 |
 | Travel / `group_travel_planner` | 默认官方历史控制路径：on 首轮前种入基础行程，逐轮把提交与反馈写入记忆；off 在新会话中带入基础行程、累计计划和反馈。复用官方 CSV `ToolExecutor` 与提交反馈。 | 按固定官方 evaluator 的六槽位、人员和组口径报告 PS/SPS/SR（百分数），完整组且每轮有宿主提交证据才出分；跨组 PS 按人数、SPS 按有约束的组、SR 按组聚合。可选 `flow=custom` 保留七槽位派生诊断。官方加载器不支持 revision，reset 后核对锁定数据。 |
 | Search / `progressive_search` | 顺序上下文子问题和最终综合问题；官方 search/get_document，支持固定 BM25 或匹配的稠密索引。 | 仅判原始最终问题，按 query ID 等权聚合；截断时 accuracy 未测。默认单次 judge 保留官方解析，多次 judge 是显式多数票扩展，保留各次原文和通过比例。不调用会自行启动另一 Agent 的上游主循环；不报告 qrel recall。 |
 | Math / `formal_reasoning_math` | 对齐的问题、答案、背景；官方 reasoning 工具与 Harbor 原生 Python/Bash。 | 保留官方等价性判断与 yes 子串解析；最终子问题决定 paper pass rate，progress 按 paper 等权聚合，曲线沿用官方分母。标准答案留在宿主评分侧。 |
@@ -89,6 +89,8 @@ Search 保留外部 Agent 流程；受管环境的最终评分会话必须附带
 缺少证据时不调用 judge，accuracy 标为未测。前轮检索、工具列表请求和失败调用不满足要求。
 脱离受管环境的 answer-only 评分保留为派生诊断，不报告官方 accuracy。
 Shopping 属性分只读取宿主从官方商品目录解析的实际购买商品名称，不从 Agent 文本推断商品属性。
+`shopping_attribute_mode=auto` 在 worker 有 OpenAI/Azure 凭据时调用固定上游 LLM judge，否则使用官方字符串回退；
+显式 `llm` 模式需要凭据，`string` 模式不调用模型。逐步 reward 的分项与模式保留在宿主环境证据中。
 Search tokenizer 固定版本及离线缓存；Shopping 的官方依赖存在冲突，独立 worker 使用已记录的兼容锁定清单，详见运行指南。
 
 <a id="lifecycle"></a>

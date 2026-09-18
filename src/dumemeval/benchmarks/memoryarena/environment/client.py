@@ -71,6 +71,37 @@ class ArenaClient:
             raise ValueError("Official product name is invalid")
         return name
 
+    def shopping_reward(
+        self,
+        step_result: dict[str, JsonValue],
+        ground_truth: dict[str, JsonValue],
+        *,
+        attribute_mode: Literal["auto", "llm", "string"] = "auto",
+        attribute_model: str = "gpt-4o",
+    ) -> dict[str, JsonValue]:
+        """Run the pinned official full WebShop reward calculator in the worker."""
+        self._require_active()
+        response = self._request(
+            "shopping_reward",
+            {
+                "step_result": step_result,
+                "ground_truth": ground_truth,
+                "attribute_mode": attribute_mode,
+                "attribute_model": attribute_model,
+            },
+        )
+        reward = response.get("reward")
+        if not isinstance(reward, dict):
+            raise ValueError("Official shopping reward response is invalid")
+        mode = response.get("attribute_mode")
+        if mode not in {"llm", "string"}:
+            raise ValueError("Official shopping attribute mode is invalid")
+        return {
+            "attribute_mode": mode,
+            "attribute_fallback_reason": response.get("attribute_fallback_reason"),
+            "reward": reward,
+        }
+
     def initialize(self) -> None:
         if self._initialized or self._closed or self._ambiguous:
             raise RuntimeError("Environment client cannot be initialized twice or reused")

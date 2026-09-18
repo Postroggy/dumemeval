@@ -2,14 +2,16 @@
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
+from unittest.mock import MagicMock
 
 import pytest
 
 from dumemeval.adapters.directory import DirectoryMemoryAdapter
 from dumemeval.benchmarks.memoryarena.datasets.travel import MemoryArenaTravelAdapter
+from dumemeval.benchmarks.memoryarena.environment.client import ArenaClient
 from dumemeval.benchmarks.memoryarena.environment.config import ArenaRuntimeConfig
-from dumemeval.benchmarks.memoryarena.environment.scenarios import TravelScenario
+from dumemeval.benchmarks.memoryarena.environment.scenarios import ShoppingScenario, TravelScenario
 from dumemeval.benchmarks.memoryarena.metrics.shopping import (
     MemoryArenaShoppingCalculator,
     score_attributes,
@@ -268,3 +270,131 @@ def test_shopping_unknown_catalog_product_scores_zero_but_lookup_error_is_unmeas
     last_evidence.info["attribute_lookup_error"] = "RuntimeError"
     failed_lookup = MemoryArenaShoppingCalculator().calculate(inp)
     assert "attribute_match_ratio" not in failed_lookup.values
+
+
+def test_shopping_full_reward_and_llm_attribute_evidence() -> None:
+    inp = shopping_input(evidence=True)
+    assert inp.execution is not None
+    for outcome, reward, attribute_ratio in zip(inp.execution.sessions, (0.4, 1.0), (0.0, 1.0), strict=True):
+        assert outcome.environment is not None
+        outcome.environment.info["attribute_mode"] = "llm"
+        outcome.environment.info["official_reward"] = {
+            "reward": reward,
+            "success": reward == 1.0,
+            "purchased_name": "Catalog product",
+            "components": {
+                "attr_match_ratio": attribute_ratio,
+                "matched_attributes": [] if not attribute_ratio else ["required"],
+                "missing_attributes": ["required"] if not attribute_ratio else [],
+                "attribute_judge": {"used_llm": True, "attempts": 1},
+            },
+            "calculation": {"final_reward": reward},
+        }
+    scored = MemoryArenaShoppingCalculator().calculate(inp)
+    assert scored.values["average_reward"] == pytest.approx(0.7)
+    assert scored.values["reward_item_success"] == 0.0
+    assert scored.values["attribute_match_ratio"] == 0.5
+    assert all(item["attribute_mode"] == "llm" for item in scored.details)
+    assert all(item["reward_components"]["attribute_judge"]["used_llm"] for item in scored.details)
+
+
+def test_shopping_pooled_reward_weights_steps_and_items() -> None:
+    calculator = MemoryArenaShoppingCalculator()
+    results = [
+        BenchmarkResult(
+            benchmark="memoryarena_shopping",
+            values={
+                "match_ground_truth": 0.5,
+                "overall_success": 0.0,
+                "attribute_match_ratio": 0.5,
+                "average_reward": 0.5,
+                "reward_item_success": 0.0,
+            },
+            details=[
+                {
+                    "score_status": "measured",
+                    "match_ground_truth": True,
+                    "reward": 1.0,
+                    "attribute_score_status": "measured",
+                    "attribute_match_ratio": 1.0,
+                },
+                {
+                    "score_status": "measured",
+                    "match_ground_truth": False,
+                    "reward": 0.0,
+                    "attribute_score_status": "measured",
+                    "attribute_match_ratio": 0.0,
+                },
+            ],
+        ),
+        BenchmarkResult(
+            benchmark="memoryarena_shopping",
+            values={
+                "match_ground_truth": 1.0,
+                "overall_success": 1.0,
+                "attribute_match_ratio": 1.0,
+                "average_reward": 1.0,
+                "reward_item_success": 1.0,
+            },
+            details=[
+                {
+                    "score_status": "measured",
+                    "match_ground_truth": True,
+                    "reward": 1.0,
+                    "attribute_score_status": "measured",
+                    "attribute_match_ratio": 1.0,
+                },
+            ],
+        ),
+    ]
+    pooled = calculator.aggregate(results)
+    assert pooled is not None
+    assert pooled.values == {
+        "match_ground_truth": pytest.approx(2 / 3),
+        "overall_success": 0.5,
+        "attribute_match_ratio": pytest.approx(2 / 3),
+        "average_reward": pytest.approx(2 / 3),
+        "reward_item_success": 0.5,
+    }
+
+
+def test_shopping_scenario_requests_pinned_full_reward(tmp_path: Path) -> None:
+    inp = shopping_input(evidence=True)
+    assert inp.task is not None
+    scenario = ShoppingScenario(
+        inp.task,
+        ArenaRuntimeConfig(
+            reference=tmp_path,
+            env_name="webshop",
+            shopping_attribute_mode="llm",
+            shopping_attribute_model="judge-model",
+        ),
+        tmp_path,
+    )
+    client_mock = MagicMock(spec=ArenaClient)
+    client_mock.observation.return_value = EnvironmentEvidence(
+        task_id="official",
+        env_name="webshop",
+        operation="get_observation",
+        observation={"purchases": [{"asin": "B000000001", "price": 12.0}]},
+    )
+    client_mock.shopping_product.return_value = "Product name"
+    client_mock.shopping_reward.return_value = {
+        "attribute_mode": "llm",
+        "reward": {"reward": 0.75, "components": {"attr_match_ratio": 0.5}},
+    }
+    official_step = {
+        "step": 1,
+        "target_asin": "B000000001",
+        "requirements": {"attributes": ["Base Mixer"], "price_constraints": {}},
+    }
+    (tmp_path / f"official-task-{inp.task.sessions[0].id}.json").write_text(
+        json.dumps({"steps": [official_step]}), encoding="utf-8"
+    )
+    evidence = scenario.submit(cast(ArenaClient, client_mock), inp.task.sessions[0], "done")
+    assert evidence.info["official_reward"] == client_mock.shopping_reward.return_value["reward"]
+    assert evidence.info["attribute_mode"] == "llm"
+    args, kwargs = client_mock.shopping_reward.call_args
+    assert args[0] == {"step": 1, "purchased_asin": "B000000001", "purchased_price": 12.0}
+    assert args[1] == official_step
+    assert kwargs == {"attribute_mode": "llm", "attribute_model": "judge-model"}

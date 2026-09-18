@@ -295,11 +295,13 @@ class ShoppingScenario(ArenaScenario):
         evidence = client.observation()
         evidence.info["episode_scope"] = "session"
         purchases = evidence.observation.get("purchases")
+        last_purchase: dict[str, JsonValue] | None = None
         if isinstance(purchases, list):
             products: list[JsonValue] = []
             for purchase in purchases:
                 if not isinstance(purchase, dict) or not isinstance(purchase.get("asin"), str):
                     continue
+                last_purchase = purchase
                 asin = str(purchase["asin"]).upper()
                 try:
                     name = client.shopping_product(asin)
@@ -308,6 +310,37 @@ class ShoppingScenario(ArenaScenario):
                     name = None
                 products.append({"asin": asin, "name": name, "price": purchase.get("price")})
             evidence.info["purchased_products"] = products
+        round_index = self.task.sessions.index(session)
+        task_file = self.directory.resolve() / f"official-task-{session.id}.json"
+        try:
+            official_task = _JSON.validate_json(task_file.read_bytes())
+        except (OSError, ValueError):
+            evidence.info["official_reward_error"] = "OfficialTaskUnavailable"
+            return evidence
+        steps = official_task.get("steps") if isinstance(official_task, dict) else None
+        gold = steps[0] if isinstance(steps, list) and len(steps) == 1 else None
+        if isinstance(gold, dict):
+            step_result: dict[str, JsonValue] = {
+                "step": round_index + 1,
+                "purchased_asin": last_purchase.get("asin") if last_purchase else None,
+                "purchased_price": last_purchase.get("price") if last_purchase else None,
+            }
+            try:
+                official = client.shopping_reward(
+                    step_result,
+                    gold,
+                    attribute_mode=self.config.shopping_attribute_mode,
+                    attribute_model=self.config.shopping_attribute_model,
+                )
+            except (RuntimeError, ValueError) as exc:
+                evidence.info["official_reward_error"] = type(exc).__name__
+            else:
+                evidence.info["official_reward"] = official["reward"]
+                evidence.info["attribute_mode"] = official["attribute_mode"]
+                if official.get("attribute_fallback_reason"):
+                    evidence.info["attribute_fallback_reason"] = official["attribute_fallback_reason"]
+        else:
+            evidence.info["official_reward_error"] = "OfficialStepUnavailable"
         return evidence
 
 

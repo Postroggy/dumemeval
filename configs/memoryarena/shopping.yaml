@@ -30,6 +30,8 @@ task:
       seed: 37
       timeout_sec: 600
       startup_timeout_sec: 600
+      shopping_attribute_mode: ${MEMORYARENA_SHOPPING_ATTRIBUTE_MODE:-auto}
+      shopping_attribute_model: ${MEMORYARENA_SHOPPING_ATTRIBUTE_MODEL:-gpt-4o}
       service_env:
         JAVA_HOME: ${MEMORYARENA_JAVA_HOME}
         JAVA_TOOL_OPTIONS: "-Xmx1024m -Dfile.encoding=UTF-8"
