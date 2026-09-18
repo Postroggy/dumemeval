@@ -58,7 +58,7 @@ Hermes 的真实记录对应 `909e185`。Claude 记录保留执行时源码指�
 
 ## 本轮 review 修复与代码检查
 
-2026-09-18 修复基于 PR head `4d240c0`。本轮代码与测试的源码指纹、命令及结果记录在
+2026-09-18 首轮修复基于 PR head `4d240c0`，最终 review 修复提交为 `d8da117`。本轮代码与测试的源码指纹、命令及结果记录在
 `verification.json` 的 `review_checks`；这与下节的历史检查互不替代。
 
 - FastAPI 路由显式注册，保留 handler 的类型；仅安装 dev 依赖时也能运行 strict mypy。

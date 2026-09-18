@@ -116,7 +116,8 @@
   },
   "review_checks": {
     "date": "2026-09-18",
-    "base_head": "4d240c0ea327b4ed6f9758ef89843083b6d7a4b7",
+    "base_head_before_fixes": "4d240c0ea327b4ed6f9758ef89843083b6d7a4b7",
+    "implementation_commit": "d8da117e8caf63122d25cf85f15eccd4d29d2de7",
     "scope": "PR #5 review fixes; no paid model calls or new real-run claims",
     "ruff": "passed",
     "format": "242 files passed",
