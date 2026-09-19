@@ -8,6 +8,7 @@
 | `shopping.yaml` / `travel.yaml` / `search.yaml` / `math.yaml` / `phys.yaml` | 五场景统一 `dumemeval prepare` / `dumemeval run` 入口，每个默认选择一条完整数据。 |
 | `search-bm25.yaml` | 官方 BM25 选项，使用固定本地索引，不需要 embedding 端点。 |
 | `controlled-math.yaml` | Claude Code 的完整两轮 Math on/off，相同提示与镜像内共用 Skill。 |
+| `controlled-travel.yaml` | Claude Code / CLIProxyAPI 的 Travel 完整八轮官方历史路径 on/off；使用独立运行名，复跑步骤与比较警告见运行指南。 |
 | `controlled-math-hermes.yaml` | 相同 Math 样本的 Hermes 对照；通过 `hermes_repro.py` 处理指定 Harbor 版本的兼容。 |
 | `hermes-memory-link.yaml` | 可选随机标记记忆通道诊断，非官方样本/分数。 |
 

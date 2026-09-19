@@ -63,15 +63,53 @@
     },
     "automatic_legacy_comparison": "unverified: agent_skills and observed_prompts missing; original reports unchanged"
   },
+  "travel_real_runs_20260919": {
+    "implementation_commit": "b4fa376",
+    "reference_revision": "6cd9de14b71915e39ac742a20dc33785e14b6aab",
+    "dataset_revision": "da1a37c8b19280e18627ca01cf368195a5e1d92e",
+    "sample": "group_travel_planner test row 1, complete eight-session group",
+    "agent": "Claude Code 2.1.89 / CLIProxyAPI v7.3.2 / gpt-5.5(medium)",
+    "judge": "gpt-5.5(medium)",
+    "docker_image": "dumemeval-claude:2.1.89-control-v2-20260915",
+    "docker_image_id": "sha256:1ade99e5f8abe9db75b3c358d627d92b17f0e53c90564fe0d012a14d19cc8bc3",
+    "on": {
+      "sessions_completed": 8,
+      "submissions": 8,
+      "history_mode": "memory_on",
+      "official_PS": 100.0,
+      "official_SPS": 100.0,
+      "official_SR": 100.0,
+      "result_sha256": "af2df0de214a9b3f1bc877be8340a26bee4d0512b6a1e5cb4eb413fc13a85d39"
+    },
+    "off": {
+      "sessions_completed": 8,
+      "submissions": 8,
+      "history_mode": "memory_off",
+      "official_PS": 87.5,
+      "official_SPS": 100.0,
+      "official_SR": 0.0,
+      "result_sha256": "0e0bab45af346885cb25d5d867e81eda0212bc7a6f2496ad4eb2f8fdec00683e"
+    },
+    "comparison_warnings": [
+      "Controlled input differs: observed_prompts; this comparison is not a controlled ablation",
+      "Controlled input differs: tasks; this comparison is not a controlled ablation"
+    ],
+    "evidence": "evidence/travel-real-20260919.zip (manifest.json records every included member SHA-256)"
+  },
   "limits": [
-    "Recorded full-suite, mypy, build and model results were not rerun during documentation consolidation.",
-    "Real model traces precede subsequent fixes; current implementation has separate regression/parity evidence.",
+    "Recorded full-suite, mypy, build and Math model results were not rerun during documentation consolidation; the Travel run was executed separately on 2026-09-19.",
+    "Earlier Math model traces precede subsequent fixes; the Travel trace records implementation b4fa376.",
     "No five-scene full-dataset run or claim of positive memory gain.",
     "Shopping wall-clock initialization is uncontrolled; full-catalog evaluation is unmeasured.",
-    "Native Linux host routing and a new account interactive login were not validated.",
+    "Native Linux host routing was not validated; Travel used Windows Docker Desktop and an interactive Codex login.",
     "Hermes framework token/cost zero is unmeasured; native token counters are retained separately."
   ],
   "archives": {
+    "evidence/travel-real-20260919.zip": {
+      "sha256": "5af73e0bdd5a45da249b1103697ea00b99a90b7de131cde3745d532c46ad77b0",
+      "bytes": 279809,
+      "members": 117
+    },
     "evidence/claude-and-tools.zip": {
       "sha256": "46937f2cb9dbaf731b17a3ef726caede54f125ad6468a4d4e7425495ed61fad3",
       "bytes": 269582,

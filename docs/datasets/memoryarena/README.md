@@ -4,7 +4,9 @@
 通过已有评测入口运行，复用官方工具及已覆盖的评分函数。Travel 默认使用官方历史控制路径，
 按六槽位计算 PS/SPS/SR，可用目录记忆的 on 与无记忆的 off 运行对照；Shopping 由固定上游
 `compute_reward.py` 计算完整 reward，按配置使用 LLM attribute judge 或字符串回退。Search 不报告 qrel recall。
-这些新增路径已有固定样例和官方源码对照测试；尚无 Travel 真实模型 on/off 新运行证据。
+这些新增路径已有固定样例和官方源码对照测试；Travel 的完整八轮真实模型 on/off
+运行见[验收报告](acceptance.md#travel-real-run)。官方历史交付方式导致两臂提示词不同，
+此次结果不能解释为严格受控的记忆收益。
 各场景的流程与评分覆盖范围见下表。
 交付说明按设计、复现、验收三个入口合并，减少逐轮修复记录对评审的干扰。
 

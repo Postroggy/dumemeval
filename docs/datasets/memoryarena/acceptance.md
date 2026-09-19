@@ -6,7 +6,7 @@
 
 实现已 rebase 到 `master` 的 `1b48fc3`。2026-09-17 的检查对应历史提交 `1a132d0`，
 不能证明后续 PR head 的类型检查或 CI 已通过。2026-09-18 review 修复的结果单列于下方，
-真实模型材料仍属于其原始执行版本。
+历史真实模型材料仍属于其原始执行版本；2026-09-19 的 Travel 真实运行另行记录。
 以下是交付方的验证记录，最终验收由维护者完成。
 
 ## 验收清单
@@ -15,11 +15,11 @@
 | --- | --- | --- |
 | 1 | 五场景锁定官方版本，记录入口/数据/环境/评分/许可证 | `sources.json` 固定源码 `6cd9de1`、数据 `da1a37c` 和关键文件哈希；未声明许可证如实记录；README 给出五场景契约。 |
 | 2 | 五场景走统一评测入口 | 五套场景 YAML 与已注册 adapter/provider/calculator；`test_cli.py` 验证统一入口。实际工具验证见下表，未声称五场景全量实跑。 |
-| 3 | 保留官方任务与评分语义 | 逐商品 Shopping ASIN 与固定上游 `compute_reward.py` 完整 reward 已接入；属性判定支持官方 LLM judge 和字符串回退。Travel 六槽位 PS/SPS/SR、默认官方 on/off 历史交付路径、Search 最终 query、Math/Phys paper 聚合已有实现。Search 不报告 qrel recall；新增 Travel 路径未记录真实模型对照结果。 |
+| 3 | 保留官方任务与评分语义 | 逐商品 Shopping ASIN 与固定上游 `compute_reward.py` 完整 reward 已接入；属性判定支持官方 LLM judge 和字符串回退。Travel 六槽位 PS/SPS/SR、默认官方 on/off 历史交付路径、Search 最终 query、Math/Phys paper 聚合已有实现。Search 不报告 qrel recall；Travel 的完整八轮真实运行见下文。 |
 | 4 | 至少一个真实环境完成 Agent 交互 | Math 中 Claude Code、Hermes 的真实 Harbor on/off 各完成 2/2 会话，并调用官方 reasoning/submit。 |
 | 5 | 多轮和跨 session memory | 首轮写入、第二独立会话读取首轮快照并更新；off 无记忆挂载。原生轨迹与快照均保留。 |
 | 6 | 三类 reset 边界可验证 | 任务/商品环境作用域、全新 Harbor 会话、协议管理的目录记忆分别管理；`test_runtime.py`、`test_completion.py` 及真实轨迹覆盖。 |
-| 7 | on/off 控制与样本对齐 | 历史同一完整 Math 样本，实际用户/系统提示和 Skill 一致，9 项当时指纹一致。旧报告缺新增字段，当前自动比较标为未验证，详见下文。 |
+| 7 | on/off 控制与样本对齐 | 历史同一完整 Math 样本，实际用户/系统提示和 Skill 一致，9 项当时指纹一致。旧报告缺新增字段，当前自动比较标为未验证。Travel 同一完整组使用官方两种历史交付路径，比较器明确警告提示词和任务指纹不同。 |
 | 8 | 五场景 fixture / 已覆盖评分路径对照 | `tests/benchmarks/memoryarena/fixtures/`、`test_official_parity.py`、`test_official_travel_shopping.py` 与 `test_shopping_reward_route.py`；新增 Travel 六槽位人员规则及 Shopping 完整 reward、LLM judge/字符串回退与固定官方源码对照。本地 HTTP 中 judge 为确定性固定样例，另有真实 Math judge 正反例。 |
 | 9 | 官方分数、judge、derived metrics、状态分离 | calculator、verifier observation、TaskExecution 和报告分别保存；相关评分与完成状态测试。 |
 | 10 | 失败/超时/跳过/未测/0 分可区分 | 缺证据、执行失败、跳过 judge 和截断任务不产生官方零分；`test_completion.py`、`test_search_scoring.py`。 |
@@ -38,7 +38,7 @@
 | Claude Code 2.1.89 / Harbor 0.22 / GPT-5.5 medium | Math on/off 各 2/2 会话、paper pass rate 均 1.0；on 写入、跨会话读取并更新，off 关闭原生自动记忆且无记忆挂载。 |
 | Hermes 0.21.3 / 同样本、同模型 | on/off 各 2/2，会话 ID 均独立且无父会话；每组两次 reasoning 和两次 submit，服务结束后关闭。 |
 | Shopping | 真实官方 lite 服务执行 search/click/购买；1,000 商品通信样例及逐商品官方固定输入对照。完整商品文件已准备，未运行全目录评分。 |
-| Travel | 官方 CSV FlightSearch 返回指定航班，官方评分器核对固定提交；属于工具/评分样例，未记录 Agent 自主行程成绩。 |
+| Travel | 官方 CSV FlightSearch 和固定评分样例；2026-09-19 完整八轮 Agent on/off 各 8/8 成功并取得官方 PS/SPS/SR，证据见下节。 |
 | Search | 官方 BM25 检索文档 5412，get_document 返回全文；固定离线 tokenizer 生成片段，语料含 100,195 篇文档。 |
 | Math / Phys | 两场景真实官方 HTTP 生命周期、reset/工具/评分固定样例；真实 Agent 实验选用 Math。 |
 
@@ -54,6 +54,33 @@ Hermes 的真实记录对应 `909e185`。Claude 记录保留执行时源码指�
 历史 summary 缺少后来新增的 `agent_skills`、`observed_prompts`；当前比较器会提示
 `experiment comparability is unverified`，保留原分数和差值。附件含带警告的重新比较结果，未回填历史字段。
 
+<a id="travel-real-run"></a>
+
+## Travel 完整组真实 on/off（2026-09-19）
+
+在实现提交 `b4fa376` 上，固定 MemoryArena 源码 `6cd9de1`、HF 数据 `da1a37c` 的
+`group_travel_planner` test 第 1 条完整组（八轮）。两臂均使用 Claude Code 2.1.89、
+CLIProxyAPI v7.3.2 转发的 `gpt-5.5(medium)` Agent 和同模型 judge、同一 Docker 镜像、
+同一 seed 37；on 为 `memory_session_transfer` + directory，off 为 `test_only` + none。
+运行配置和复跑命令见[运行指南](clean-setup.md#travel-controlled-run)。
+
+| 真实运行 | 会话与宿主提交 | 官方 PS | 官方 SPS | 官方 SR | 历史交付证据 |
+| --- | --- | ---: | ---: | ---: | --- |
+| on | 8/8 成功，8/8 `submit` | 100.0 | 100.0 | 100.0 | `memory_on`；每轮历史条目数 0–7；目录快照及持久文件。 |
+| off | 8/8 成功，8/8 `submit` | 87.5 | 100.0 | 0.0 | `memory_off`；每轮历史条目数 0–7；无持久记忆文件。 |
+
+off 的第 5 个人未达到官方整人通过条件，其余七人通过；两臂均有完整组评分证据。
+比较器给出 `Controlled input differs: observed_prompts` 和 `Controlled input differs: tasks`，
+并标记 `this comparison is not a controlled ablation`。这是官方 on 从目录记忆取历史、
+off 在提示词中显式接收累计历史的预期差异；分数差仅描述这一次样本与调用，
+不能归因为记忆的独立收益，也不能推广到全量数据。
+
+[travel-real-20260919.zip](evidence/travel-real-20260919.zip) 保存两臂的脱敏配置、
+summary、逐任务结果与报告、受管环境轨迹、Agent 轨迹、on 的跨会话快照、比较结果，
+以及每个成员的 SHA-256 清单。原始运行目录仍在本地 `results/memoryarena/travel-real-20260919-final/`，
+失败的预备尝试不纳入此对照；附件哈希见 [verification.json](verification.json)。
+完整原生 Claude 日志和临时账号认证材料不在附件中。
+
 <a id="checks"></a>
 
 ## 本轮 review 修复与代码检查
@@ -63,12 +90,12 @@ on/off 历史路径与 Shopping 属性字符串评分；以下新增验证以本
 
 - FastAPI 路由显式注册，保留 handler 的类型；仅安装 dev 依赖时也能运行 strict mypy。
 - Search 受管最终评分要求本轮成功检索证据；没有证据时不调用 judge。answer-only 结果为派生诊断。
-- Travel 增加默认官方历史控制路径与六槽位 PS/SPS/SR；旧七槽位诊断仅在显式 custom flow 下使用。新路径已有固定样例和官方源码对照，尚未做真实模型 on/off 实验。
+- Travel 增加默认官方历史控制路径与六槽位 PS/SPS/SR；旧七槽位诊断仅在显式 custom flow 下使用。新路径已有固定样例、官方源码对照及上节完整组真实模型运行。
 - 评分范围贯穿 JSON、Markdown、Utility 与比较；派生值不再进入 `official_task_score`，不能混入官方聚合。
 - Shopping backend 由 runtime 统一管理，版本/依赖参与稳定指纹，端口/清理结果记录于 provenance；固定上游完整 reward 在受管 worker 中计算，`auto` 模式在 LLM judge 无法建立时保留完整字符串回退 reward，目录加载在任务进程内缓存。
 - 资源脚本纳入 `make ci` 的 Ruff/mypy 范围，补充离线 manifest 测试；Source 扫描覆盖整个 `src/dumemeval`。
 
-本轮不重新执行付费模型实验，不改变原始真实运行证据。Linux `make ci` 以当前 PR Checks 为准，
+2026-09-18 review 阶段未重新执行付费模型实验；9 月 19 日新增 Travel 运行单列，原始 Math 证据不变。Linux `make ci` 以当前 PR Checks 为准，
 Windows 检查不能替代 Linux 门禁。
 
 当前 Windows / Python 3.12.11：`PYTHONUTF8=1` 的全仓非 e2e 测试在排除下节已复现的 3 项
@@ -106,18 +133,19 @@ GitHub 的 Linux 检查执行仓库统一 `make ci`，状态以 PR Checks 为准
 | [claude-and-tools.zip](evidence/claude-and-tools.zip) | `results/memoryarena/controlled-final-20260915/` 的 on/off、comparison、原生/ATIF/环境轨迹、快照；`official-assets-20260915/` 的三个外部资源场景。 |
 | [hermes.zip](evidence/hermes.zip) | `math/validation.json`、`math/{on,off}/`、`math/prompts/`；`diagnostic/` 与首次 401 失败材料分开。 |
 | [checks.zip](evidence/checks.zip) | `rebase-1b48fc3/` 当前检查与 Windows 基线；`f3fdd92/` 历史功能检查；`baseline/` 上游日志；`setup/` 安装验证；`environment-probes/shopping/` 逐商品环境证据；`historical-recomparison/` 旧报告缺失字段警告。 |
-| [verification.json](verification.json) | 三个 ZIP 的 SHA-256、结果摘要、历史提交、对照复核与本次整理检查。 |
+| [travel-real-20260919.zip](evidence/travel-real-20260919.zip) | 新增 Travel 完整八轮 on/off 的评分、会话/环境/Agent 轨迹、记忆快照、比较警告和成员 SHA-256。 |
+| [verification.json](verification.json) | 四个 ZIP 的 SHA-256、结果摘要、历史提交、对照复核与本次整理检查。 |
 
-前两份 ZIP 与原提交字节一致；`checks.zip` 合并保留最终检查和必要基线记录，`origins.json` 给出原档案成员及哈希。
+旧的两份模型 ZIP 与原提交字节一致；`checks.zip` 合并保留最终检查和必要基线记录，`origins.json` 给出原档案成员及哈希。
 原始运行/检查清单在其中的 `manifests/`，其路径和哈希属于当时版本。当前复跑以运行指南为准。
 历次过程说明可在 Git 历史查阅，不再作为当前交付的平级文档。
 
 ## 已知差异与未测范围
 
-- 未运行五场景全量数据，未证明正向或统计显著的记忆收益；真实模型结果不代表后续修复代码的重新实跑。
-- 两组保持配置及采样设置一致，未声称模型服务提供全局确定性随机种子。
+- 未运行五场景全量数据，未证明统计显著的记忆收益；旧 Math 模型结果不代表后续修复代码的重新实跑。Travel 新运行对应 `b4fa376`。
+- 除官方历史交付方式和记忆协议外，两组固定同一数据、模型、镜像与 seed；未声称模型服务提供全局确定性随机种子。
 - Shopping 上游按系统时间初始化的随机性未控制，已写入 provenance；Math 对照不使用 Shopping 环境。
-- Travel 新增的官方 on/off 路径和尚未实跑的 Shopping LLM/完整 reward 路径只有确定性样例与固定上游源码对照，尚无本次提交的真实 Agent 运行结果；Travel on 历史中的官方 Agent 内部 scratchpad 无法由宿主获取，当前为空。
+- Shopping LLM/完整 reward 路径已有固定上游源码对照，尚无真实 Agent 全目录运行结果；Travel on 历史中的官方 Agent 内部 scratchpad 无法由宿主获取，当前为空。Travel 官方两臂提示词和任务指纹不同，比较器不认定为严格受控消融。
 - Search 多数票是可选扩展，不报告 qrel recall；官方依赖与兼容 worker 的差异已记录。
 - Hermes 的 Harbor ATIF 未携带会话级 token 统计；框架 token/cost=0 表示未测，原生用量另存，费用未知。
 - 记忆观测是下界：Claude 结构化 Read 可自动计数，Hermes 使用原生读取证据；任意 shell 读取或写后恢复原内容可能无法计数。

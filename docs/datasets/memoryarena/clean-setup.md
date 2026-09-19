@@ -201,6 +201,48 @@ $runDir = Join-Path 'results/memoryarena' $env:MEMORYARENA_CONTROL_RUN
 按 [验收记录](acceptance.md) 检查 summary 状态、官方分数和比较警告。
 模型输出及记忆使用方式可能变化；取得正向记忆收益不是验收条件。
 
+<a id="travel-controlled-run"></a>
+
+### Travel 官方历史路径的真实模型 on/off
+
+完成第 1–2 步的框架、代理登录，以及第 4 节 Claude 镜像构建段，再用第 5 节的
+`prepare_assets.py --scene travel` 生成固定数据库并设置 `MEMORYARENA_TRAVEL_DATABASE`。
+以下配置复用同一个 `gpt-5.5(medium)` Agent/judge、同一镜像和固定数据；
+每组运行完整八轮，需要可工作的 Linux Docker Engine。这里的 worker 使用已安装
+MemoryArena 可选依赖的框架 Python。`MEMORYARENA_REFERENCE` 指向固定源码，
+`DUMEMEVAL_PROXY_KEY` 来自第 2 步的私有代理配置。
+
+```powershell
+$env:MEMORYARENA_PYTHON = $python
+$env:MEMORYARENA_CONTROL_IMAGE = 'dumemeval-claude:2.1.89-repro'
+$env:MEMORYARENA_TRAVEL_RUN = 'travel-controlled-' + (Get-Date -Format 'yyyyMMdd-HHmmss')
+# Harbor 的 host model_connection 会读取当前进程的这两个变量。
+$env:ANTHROPIC_AUTH_TOKEN = $env:DUMEMEVAL_PROXY_KEY
+$env:ANTHROPIC_BASE_URL = 'http://host.docker.internal:8317'
+$config = 'configs/memoryarena/controlled-travel.yaml'
+
+$env:MEMORYARENA_ARM = 'on'
+$env:MEMORYARENA_PROTOCOL = 'memory_session_transfer'
+$env:MEMORYARENA_MEMORY_TYPE = 'directory'
+& $python -m dumemeval run --config $config --no-resume
+if ($LASTEXITCODE -ne 0) { throw 'Travel on run failed' }
+
+$env:MEMORYARENA_ARM = 'off'
+$env:MEMORYARENA_PROTOCOL = 'test_only'
+$env:MEMORYARENA_MEMORY_TYPE = 'none'
+& $python -m dumemeval run --config $config --no-resume
+if ($LASTEXITCODE -ne 0) { throw 'Travel off run failed' }
+
+$runDir = Join-Path 'results/memoryarena' $env:MEMORYARENA_TRAVEL_RUN
+& $python -m dumemeval compare (Join-Path $runDir 'off') (Join-Path $runDir 'on') --baseline off --output (Join-Path $runDir 'comparison')
+if ($LASTEXITCODE -ne 0) { throw 'Travel comparison failed' }
+```
+
+2026-09-19 的实测结果及脱敏证据见[验收报告](acceptance.md#travel-real-run)。
+该次记录使用的镜像 tag、ID 见 [verification.json](verification.json)；重新构建的镜像 ID 可以不同。
+官方 off 分支在任务提示词里带累计历史，on 分支通过记忆获得历史，因此比较器
+会提示 `observed_prompts` 和 `tasks` 不同；比较分数只描述当次运行，不构成严格受控消融。
+
 ### Hermes（可选）
 
 复用第 1–3 步的变量和样本，无需构建 Claude 镜像。
@@ -435,4 +477,4 @@ if ($null -ne $proxyProcess -and -not $proxyProcess.HasExited) { Stop-Process -I
 | comparison 报缺少指纹 | 旧报告不具备新增字段；保持原始分数，将自动可比性标为未验证，不补造证据。 |
 | token/cost 为零 | Hermes 的 Harbor ATIF 缺少会话级用量；查原生统计，费用未知，不把零解释为免费调用。 |
 
-验证限于已记录的 Windows 环境、最小真实 Math 实验和官方固定样例；未执行五场景全量评测、原生 Linux 宿主或新账号交互登录。
+验证限于已记录的 Windows 环境、真实 Math 与 Travel 实验和官方固定样例；未执行五场景全量评测或原生 Linux 宿主验证。
