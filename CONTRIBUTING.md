@@ -63,12 +63,12 @@ make coverage     # 覆盖率报告（不进 CI 门禁）
 
 ## 加一个数据集
 
-1. `datasets/benchmarks/<name>.py`：`BenchmarkData.from_raw` + `BenchmarkAdapter.build_tasks` → `list[EvalTask]`。每个问答 session 尽量填 `SessionSpec.query`（不要靠「最后一个 session」对齐）。
+1. 多场景或自带环境的数据集族放在 `src/dumemeval/benchmarks/<name>/`，内部按 `datasets/`、`metrics/`、`environment/` 分工；简单适配器也可继续使用 `datasets/benchmarks/<name>.py`。`BenchmarkData.from_raw` + `BenchmarkAdapter.build_tasks` → `list[EvalTask]`，问答 session 填 `SessionSpec.query`。
 2. **docstring 必须带来源 URL**：`Source: <官方仓库 / HF dataset>`，有论文再加 `Paper: <arxiv>`。本地 `Dataset/` 路径不算来源——社区拿不到你的本地盘。
-3. `@register_benchmark` 装饰 adapter；在 `datasets/benchmarks/__init__.py` import 该模块。
-4. `metrics/<name>.py`：`MetricCalculator` 子类，`kind = "benchmark"`，docstring 写官方实现的文件名 + 关键函数；官方代码未公开时显式标注「自定义，非官方镜像」。
-5. 在 `metrics/__init__.py` 的 `register_calculator(...)` 列表里加一行。
-6. 在 [docs/datasets/](docs/datasets/README.md) 新增 `<dataset>.md` 并在表格追加一行。
+3. 用 `@register_benchmark` 注册 adapter；在 `datasets/benchmarks/__init__.py` 导入模块或集成包，沿用已有初始化方式。包导入不应启动服务或加载可选模型 SDK。
+4. 在数据集自己的 `metrics/` 实现 `MetricCalculator`，`kind = "benchmark"`；docstring 写官方实现的文件名 + 关键函数，官方代码未公开时标注「自定义，非官方镜像」。
+5. 用 `register_calculator(Cls, *aliases)` 注册计算器和别名；简单计算器继续在 `metrics/__init__.py` 注册，集成包可在自己的 `metrics/__init__.py` 注册，由 `metrics/benchmarks/__init__.py` 导入。无需修改通用注册表的查询函数。
+6. 测试与 fixture 放在 `tests/benchmarks/<name>/`，设计与验收材料放在 `docs/datasets/<name>/`，并更新[数据集索引](docs/datasets/README.md)。目录和兼容例子见 [MemoryArena](docs/datasets/memoryarena/README.md#compatibility)，注册方式见[原框架复用](docs/datasets/memoryarena/README.md#architecture)。
 7. **禁止**新增 `scripts/<bench>/*_ingestion.py` 六段流水线。
 
 口径测试用固定 fixture，不要打真实 LLM。
@@ -83,10 +83,11 @@ make coverage     # 覆盖率报告（不进 CI 门禁）
 
 ## 加一个任务环境
 
-1. 在 `environments.py` 继承 `TaskEnvironmentProvider`，设 `name`，实现 `endpoint` / `usage_hint` / `env_vars` 三方法。
-2. `register_task_environment` 注册。内置两个：`http`（通用模板，暴露 `TASK_ENV_URL`）、`webshop`（对齐 MemoryArena env server 的 `/env/*` 协议）。
-3. 任务环境只负责把 endpoint / 动作空间暴露给 agent；环境内行动的评分走对应 benchmark 的官方 calculator，不要在这里写打分逻辑。
-4. 参考 `docs/execution/task-environment-layer.md`。纯文本多轮 QA 的适配器（如 travel / search / math）不需要任务环境。
+1. 在数据集的 `environment/` 中继承 `TaskEnvironmentProvider`，设 `name`，实现 `endpoint` / `usage_hint` / `env_vars`。通用协议保留在 `environments.py` 和 `task_environments/base.py`。
+2. 用 `@register_task_environment` 注册；内置实现由 `environments.py` 在契约与注册函数定义完毕后导入。已有 `http`、外部 `webshop` 和受管 `memoryarena` 三种 provider。
+3. 受管环境实现 `create_runtime` 及 `TaskEnvironmentRuntime` 生命周期，按需实现 `prepare`。评分仍由对应 benchmark calculator 负责。
+4. 通过 `observed_control_keys` 声明必须观测的控制项，在 `runtime.json` 中写 `EnvironmentControls`。选择稳定字段，声明未控制的因素；通用报告不解释数据集的内部字段。
+5. 参考[任务环境层](docs/execution/task-environment-layer.md)。环境资源与记忆各自管理；不得在 SessionRunner 增加数据集分支。
 
 ## PR 检查单
 

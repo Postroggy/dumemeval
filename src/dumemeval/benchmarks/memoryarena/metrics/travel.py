@@ -1,4 +1,7 @@
-"""MemoryArena travel 官方指标：slot 相似度 + judgement_mode（hint / answer / none）。
+"""Travel scoring for the official flow and optional custom diagnostics.
+
+The official flow uses the pinned offline evaluator's six-slot PS/SPS/SR.
+The custom flow retains seven-slot online-reward diagnostics as derived metrics.
 
 对齐 vendors/MemoryArena/env/env_systems/travel_env.py：
 - 成功判定：_evaluate_slots（slot 相似度 ≥ 0.7），不是「有输出就算成功」
@@ -13,7 +16,15 @@ import difflib
 import re
 from typing import Any, ClassVar, Literal
 
-from ..core.base import MetricBundle, MetricCalculator, MetricInput, MetricKind, round_items
+from dumemeval.metrics.core.base import (
+    MetricBundle,
+    MetricCalculator,
+    MetricInput,
+    MetricKind,
+    outcome_for_round,
+    round_items,
+)
+from dumemeval.models import BenchmarkResult
 
 SLOTS = [
     "current_city",
@@ -57,7 +68,9 @@ def parse_person_plan(result_text: str, name: str) -> list[dict[str, Any]]:
     if name:
         pattern = rf"===\s*{re.escape(name)}'s Plan\s*===(.*?)(?====|$)"
         match = re.search(pattern, result_text, re.DOTALL)
-        plan_text = match.group(1).strip() if match else result_text
+        if not match:
+            return []
+        plan_text = match.group(1).strip()
     else:
         plan_text = result_text
     days: list[dict[str, Any]] = []
@@ -103,7 +116,7 @@ def evaluate_slots(model_plan: list[dict[str, Any]], gt_plans: list[dict[str, An
 
 
 def slot_match_rate(model_plan: list[dict[str, Any]], gt_plans: list[dict[str, Any]]) -> float:
-    """slot 级命中率（辅助指标；round_success 仍走官方全槽位阈值）。"""
+    """slot 级命中率（辅助指标；derived_round_success 仍走在线全槽位阈值）。"""
     total = 0
     matched = 0
     for gt_day in gt_plans:
@@ -162,7 +175,7 @@ def judge_round(
     model_plan = parse_person_plan(pred, person_name)
     # 解析不出官方 `=== Name's Plan ===` 结构 → 判败（不做 GT 反向兜底：
     # 旧 fallback 用"GT 值是否出现在输出里"反构造 plan 再自比相似度，
-    # 自证循环会虚高 round_success）
+    # 自证循环会虚高 derived_round_success）
     success = evaluate_slots(model_plan, gt_plans)
     judgement = ""
     if judgement_mode == "hint":
@@ -179,17 +192,22 @@ def judge_round(
 
 
 class MemoryArenaTravelCalculator(MetricCalculator):
-    """MemoryArena travel：round_success = 官方 slot 判定。"""
+    """Keep online reward diagnostics separate from uncovered official aggregates."""
 
     name: ClassVar[str] = "memoryarena_travel"
     kind: ClassVar[MetricKind] = "benchmark"
+    metrics: ClassVar[tuple[str, ...]] = ("PS", "SPS", "SR", "derived_round_success", "derived_slot_accuracy")
 
     def __init__(self, judgement_mode: JudgementMode = "hint"):
         self.judgement_mode = judgement_mode
 
     def calculate(self, inp: MetricInput) -> MetricBundle:
         task = inp.task
-        data = task.data if task is not None and isinstance(task.data, dict) else {}
+        if task is None:
+            return MetricBundle(name=self.name, kind=self.kind)
+        if task.data.get("execution_flow") == "official_travel":
+            return self._calculate_official(inp)
+        data = task.data if isinstance(task.data, dict) else {}
         mode = inp.extra.get("judgement_mode") or data.get("judgement_mode") or self.judgement_mode
         if mode not in ("hint", "answer", "none"):
             mode = "hint"
@@ -200,12 +218,32 @@ class MemoryArenaTravelCalculator(MetricCalculator):
         n = 0
         for idx, question, query, gt, pred in round_items(inp):
             n += 1
+            detail: dict[str, Any] = {
+                "round_idx": idx,
+                "execution_flow": "custom_independent_sessions",
+                "metric_scope": "derived_online_reward",
+                "official_score": None,
+                "official_metrics": {"PS": None, "SPS": None, "SR": None},
+                "official_score_status": "not_measured",
+                "official_comparison_status": "not_covered",
+                "score_status": "not_measured",
+            }
+            details.append(detail)
+            outcome = outcome_for_round(inp, idx)
+            evidence = outcome.environment if outcome else None
+            managed = task.task_environment.get("type") == "memoryarena"
+            if (
+                managed and (evidence is None or evidence.reward is None or evidence.status != "completed")
+            ) or (outcome and not outcome.success):
+                continue
             name = question.get("name", "") if isinstance(question, dict) else ""
             judged = judge_round(pred, gt, name=name, judgement_mode=mode)
+            if evidence and evidence.env_name == "travel_planner" and evidence.reward is not None:
+                judged["success"] = bool(evidence.reward)
             if judged["success"]:
                 successes += 1
             slot_scores.append(float(judged["slot_accuracy"]))
-            details.append(
+            detail.update(
                 {
                     "round_idx": idx,
                     "query": query,
@@ -213,16 +251,100 @@ class MemoryArenaTravelCalculator(MetricCalculator):
                     "slot_accuracy": judged["slot_accuracy"],
                     "judgement_mode": judged["judgement_mode"],
                     "judgement": judged["judgement"],
+                    "score_status": "measured",
+                    "derived_score": float(judged["success"]),
                 }
             )
 
-        values = {
-            "round_success": successes / n if n else 0.0,
-            "slot_accuracy": sum(slot_scores) / len(slot_scores) if slot_scores else 0.0,
-        }
+        values = (
+            {
+                "derived_round_success": successes / n if n else 0.0,
+                "derived_slot_accuracy": sum(slot_scores) / len(slot_scores) if slot_scores else 0.0,
+            }
+            if n and all(d["score_status"] == "measured" for d in details)
+            else {}
+        )
         return MetricBundle(
             name=self.name,
             kind=self.kind,
+            score_scope="derived",
+            coverage_note=(
+                "Custom independent-session Travel flow: memory seed and off history differ from upstream. "
+                "Official PS/SPS/SR and the official on/off comparison are not measured. "
+                "Derived diagnostics use the online environment's seven slots, including current_city."
+            ),
             values=values,
             details=details,
         )
+
+    def _calculate_official(self, inp: MetricInput) -> MetricBundle:
+        """Score complete host-observed groups with the pinned offline evaluator's rules."""
+        from .travel_official import group_values, person_result
+
+        assert inp.task is not None
+        task = inp.task
+        base = task.data.get("base_person")
+        base_plan = base.get("daily_plans", []) if isinstance(base, dict) else []
+        details: list[dict[str, Any]] = []
+        for idx, question, query, gt, _pred in round_items(inp):
+            outcome = outcome_for_round(inp, idx)
+            evidence = outcome.environment if outcome else None
+            detail: dict[str, Any] = {
+                "sample_id": task.data.get("sample_id"),
+                "round_idx": idx,
+                "person_idx": question.get("round_idx") if isinstance(question, dict) else idx + 1,
+                "query": query,
+                "execution_status": "completed" if outcome and outcome.success else "failed",
+                "score_status": "not_measured",
+                "official_score": None,
+            }
+            details.append(detail)
+            if (
+                outcome is None
+                or evidence is None
+                or evidence.status != "completed"
+                or evidence.env_name != "travel_planner"
+                or evidence.session_id != outcome.session_id
+                or evidence.tool != "submit"
+                or evidence.info.get("history_mode") not in {"memory_on", "memory_off"}
+                or evidence.info.get("history_rounds") != idx
+            ):
+                continue
+            name = str(question.get("name", "")) if isinstance(question, dict) else ""
+            _, ground_truth = _as_daily_plans(gt, name)
+            if not ground_truth:
+                continue
+            host_answer = evidence.arguments.get("answer")
+            submitted = parse_person_plan(
+                host_answer if isinstance(host_answer, str) else outcome.observation, name
+            )
+            full_pass, constraint_rate = person_result(ground_truth, submitted, base_plan)
+            detail.update(
+                score_status="measured",
+                history_mode=evidence.info["history_mode"],
+                official_score=float(full_pass),
+                person_full_pass=full_pass,
+                constraint_rate=constraint_rate,
+                submitted_plan=submitted,
+            )
+        complete = (
+            len(details) == task.data.get("source_round_count")
+            and bool(details)
+            and all(item["score_status"] == "measured" for item in details)
+            and len({item.get("history_mode") for item in details}) == 1
+        )
+        return MetricBundle(
+            name=self.name,
+            kind=self.kind,
+            score_scope="official",
+            coverage_note="Pinned Travel offline evaluator: six-slot PS/SPS/SR percentages.",
+            values=group_values(details) if complete else {},
+            details=details,
+        )
+
+    def aggregate(self, results: list[BenchmarkResult]) -> BenchmarkResult | None:
+        if not results or results[0].score_scope != "official":
+            return None
+        from .travel_official import aggregate_groups
+
+        return aggregate_groups(results)

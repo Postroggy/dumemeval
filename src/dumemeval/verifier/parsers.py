@@ -32,38 +32,58 @@ def parse_judge_response(judge_response: str) -> dict[str, Any]:
         result["parse_error"] = True
         return result
 
-    answer_match = re.search(
-        r"\*\*extracted_final_answer:\*\*\s*(.*?)(?=\n|$)",
-        judge_response,
-        re.IGNORECASE | re.DOTALL,
-    ) or re.search(
-        r"extracted_final_answer:\s*(.*?)(?=\n|$)",
-        judge_response,
-        re.IGNORECASE | re.DOTALL,
+    answer_match = (
+        re.search(
+            r"\*\*extracted_final_answer:\*\*\s*(.*?)(?=\n|$)",
+            judge_response,
+            re.IGNORECASE | re.DOTALL,
+        )
+        or re.search(
+            r"\*\*extracted_final_answer\*\*:\s*(.*?)(?=\n|$)",
+            judge_response,
+            re.IGNORECASE | re.DOTALL,
+        )
+        or re.search(
+            r"extracted_final_answer:\s*(.*?)(?=\n|$)",
+            judge_response,
+            re.IGNORECASE | re.DOTALL,
+        )
     )
     if answer_match:
         result["extracted_final_answer"] = answer_match.group(1).strip()
 
-    correct_match = re.search(r"\*\*correct:\*\*\s*(yes|no)", judge_response, re.IGNORECASE) or re.search(
-        r"correct:\s*(yes|no)", judge_response, re.IGNORECASE
+    correct_match = (
+        re.search(r"\*\*correct:\*\*\s*(yes|no)", judge_response, re.IGNORECASE)
+        or re.search(r"\*\*correct\*\*:\s*(yes|no)", judge_response, re.IGNORECASE)
+        or re.search(r"correct:\s*(yes|no)", judge_response, re.IGNORECASE)
     )
     if correct_match:
         result["correct"] = correct_match.group(1).lower() == "yes"
 
-    confidence_match = re.search(
-        r"\*\*confidence:\*\*\s*(\d+(?:\.\d+)?)\s*%?", judge_response, re.IGNORECASE
-    ) or re.search(r"confidence:\s*(\d+(?:\.\d+)?)\s*%?", judge_response, re.IGNORECASE)
+    confidence_match = (
+        re.search(r"\*\*confidence:\*\*\s*(\d+(?:\.\d+)?)\s*%?", judge_response, re.IGNORECASE)
+        or re.search(r"\*\*confidence\*\*:\s*(\d+(?:\.\d+)?)\s*%?", judge_response, re.IGNORECASE)
+        or re.search(r"confidence:\s*(\d+(?:\.\d+)?)\s*%?", judge_response, re.IGNORECASE)
+    )
     if confidence_match:
         result["confidence"] = min(float(confidence_match.group(1)), 100.0)
 
-    reasoning_match = re.search(
-        r"\*\*reasoning:\*\*\s*(.*?)(?=\n\*\*correct|\ncorrect:|$)",
-        judge_response,
-        re.IGNORECASE | re.DOTALL,
-    ) or re.search(
-        r"reasoning:\s*(.*?)(?=\n\*\*correct|\ncorrect:|$)",
-        judge_response,
-        re.IGNORECASE | re.DOTALL,
+    reasoning_match = (
+        re.search(
+            r"\*\*reasoning:\*\*\s*(.*?)(?=\n\*\*correct:\*\*|\n\*\*correct\*\*:|\ncorrect:|$)",
+            judge_response,
+            re.IGNORECASE | re.DOTALL,
+        )
+        or re.search(
+            r"\*\*reasoning\*\*:\s*(.*?)(?=\n\*\*correct:\*\*|\n\*\*correct\*\*:|\ncorrect:|$)",
+            judge_response,
+            re.IGNORECASE | re.DOTALL,
+        )
+        or re.search(
+            r"reasoning:\s*(.*?)(?=\ncorrect:|$)",
+            judge_response,
+            re.IGNORECASE | re.DOTALL,
+        )
     )
     if reasoning_match:
         result["reasoning"] = reasoning_match.group(1).strip()

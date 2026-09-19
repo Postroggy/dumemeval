@@ -1,0 +1,308 @@
+{
+  "issue": "https://github.com/Postroggy/dumemeval/issues/4",
+  "documentation_consolidation_date": "2026-09-17",
+  "implementation_commit": "1a132d02e8867dd4e17efc45d30f8b0619eb71b6",
+  "upstream_commit": "1b48fc3e54e8282f00b710083ee24e6f12b14c70",
+  "historical_hermes_run_commit": "909e185d043d04db1b5c21df1b610eef52fa0c1c",
+  "recorded_checks": {
+    "date": "2026-09-16",
+    "platform": "Windows / Python 3.12.11",
+    "full_non_e2e": {
+      "passed": 632,
+      "failed": 108,
+      "skipped": 13
+    },
+    "upstream_non_e2e": {
+      "passed": 389,
+      "failed": 109,
+      "skipped": 13
+    },
+    "related_passed": 232,
+    "official_parity_passed_in_related": 33,
+    "mypy_errors": 152,
+    "upstream_mypy_errors": 173,
+    "new_failed_test_identities_from_upstream": [],
+    "new_mypy_diagnostics_from_upstream": [],
+    "ruff": "passed",
+    "format": "229 files passed",
+    "wheel_and_sdist": "passed",
+    "installed_source_modules_verified": 154,
+    "isolated_import_and_registry_checks": 8,
+    "installed_official_math_worker_lifecycle": "passed",
+    "evidence": "evidence/checks.zip: f3fdd92/ and baseline/",
+    "implementation_commit": "f3fdd925842dc98dda667a6ee28a06b0ac656ac8",
+    "upstream_commit": "37a0e1959e14509898fca856d8fd3fd2a720aefb"
+  },
+  "real_runs": {
+    "sample": "Math row 39, paper 2507.18621, two questions",
+    "sample_sha256": "82a430425b49471c68a8fc8a00caffe4fd505678fb8001f785abd565a5c3b868",
+    "claude_code": {
+      "version": "2.1.89",
+      "on_sessions": 2,
+      "off_sessions": 2,
+      "on_passrate": 1.0,
+      "off_passrate": 1.0
+    },
+    "hermes": {
+      "version": "0.21.3",
+      "on_sessions": 2,
+      "off_sessions": 2,
+      "on_passrate": 1.0,
+      "off_passrate": 1.0
+    },
+    "hermes_controls_rechecked": {
+      "actual_user_prompts_equal_per_session": true,
+      "native_system_prompts_equal": true,
+      "observed_skill_view_results_equal": true,
+      "recorded_control_fingerprints_equal": 9,
+      "distinct_native_sessions": 4,
+      "all_native_parent_sessions_null": true,
+      "second_session_read_matches_first_snapshot": true,
+      "memory_updated_in_second_session": true,
+      "method": "Read original native traces and prompts; remove read_file line-number display prefixes when matching snapshots."
+    },
+    "automatic_legacy_comparison": "unverified: agent_skills and observed_prompts missing; original reports unchanged"
+  },
+  "travel_real_runs_20260919": {
+    "implementation_commit": "b4fa376",
+    "reference_revision": "6cd9de14b71915e39ac742a20dc33785e14b6aab",
+    "dataset_revision": "da1a37c8b19280e18627ca01cf368195a5e1d92e",
+    "sample": "group_travel_planner test row 1, complete eight-session group",
+    "agent": "Claude Code 2.1.89 / CLIProxyAPI v7.3.2 / gpt-5.5(medium)",
+    "judge": "gpt-5.5(medium)",
+    "docker_image": "dumemeval-claude:2.1.89-control-v2-20260915",
+    "docker_image_id": "sha256:1ade99e5f8abe9db75b3c358d627d92b17f0e53c90564fe0d012a14d19cc8bc3",
+    "on": {
+      "sessions_completed": 8,
+      "submissions": 8,
+      "history_mode": "memory_on",
+      "official_PS": 100.0,
+      "official_SPS": 100.0,
+      "official_SR": 100.0,
+      "result_sha256": "af2df0de214a9b3f1bc877be8340a26bee4d0512b6a1e5cb4eb413fc13a85d39"
+    },
+    "off": {
+      "sessions_completed": 8,
+      "submissions": 8,
+      "history_mode": "memory_off",
+      "official_PS": 87.5,
+      "official_SPS": 100.0,
+      "official_SR": 0.0,
+      "result_sha256": "0e0bab45af346885cb25d5d867e81eda0212bc7a6f2496ad4eb2f8fdec00683e"
+    },
+    "comparison_warnings": [
+      "Controlled input differs: observed_prompts; this comparison is not a controlled ablation",
+      "Controlled input differs: tasks; this comparison is not a controlled ablation"
+    ],
+    "evidence": "evidence/travel-real-20260919.zip (manifest.json records every included member SHA-256)"
+  },
+  "limits": [
+    "Recorded full-suite, mypy, build and Math model results were not rerun during documentation consolidation; the Travel run was executed separately on 2026-09-19.",
+    "Earlier Math model traces precede subsequent fixes; the Travel trace records implementation b4fa376.",
+    "No five-scene full-dataset run or claim of positive memory gain.",
+    "Shopping wall-clock initialization is uncontrolled; full-catalog evaluation is unmeasured.",
+    "Native Linux host routing was not validated; Travel used Windows Docker Desktop and an interactive Codex login.",
+    "Hermes framework token/cost zero is unmeasured; native token counters are retained separately."
+  ],
+  "archives": {
+    "evidence/travel-real-20260919.zip": {
+      "sha256": "5af73e0bdd5a45da249b1103697ea00b99a90b7de131cde3745d532c46ad77b0",
+      "bytes": 279809,
+      "members": 117
+    },
+    "evidence/claude-and-tools.zip": {
+      "sha256": "46937f2cb9dbaf731b17a3ef726caede54f125ad6468a4d4e7425495ed61fad3",
+      "bytes": 269582,
+      "members": 113
+    },
+    "evidence/hermes.zip": {
+      "sha256": "edbd423d38963fefd4dde2862ee9f68be98b3a1dd549f564c216deff6b4fae60",
+      "bytes": 336679,
+      "members": 175
+    },
+    "evidence/checks.zip": {
+      "sha256": "a3e533d0acb00166e1e80aa6de90729a6c83835af73aa4c13c6bf83b0647ee04",
+      "bytes": 161303,
+      "members": 53
+    }
+  },
+  "documentation_checks": {
+    "documentation_files_before": 29,
+    "documentation_files_after": 8,
+    "main_markdown_files": 3,
+    "changed_markdown_files_checked": 8,
+    "local_links_and_anchors_checked": 41,
+    "broken_links": [],
+    "powershell_blocks_parsed": 12,
+    "powershell_syntax_errors": [],
+    "zip_members_crc_checked": 323,
+    "archived_json_and_jsonl_files_parsed": 198,
+    "original_real_run_archives_byte_identical": true,
+    "retained_check_members_byte_identical": true,
+    "upstream_failure_and_mypy_comparison": "no new identities or diagnostics",
+    "hermes_raw_control_and_cross_session_memory_recheck": "passed",
+    "production_source_and_dependency_files_unchanged": true,
+    "changed_test": "tests/benchmarks/memoryarena/test_historical_controls.py: archive path only",
+    "pytest": {
+      "passed": 10,
+      "failed": 0,
+      "command": "python -m pytest tests/benchmarks/memoryarena/test_historical_controls.py tests/test_control_completeness.py -q -o addopts= --tb=short"
+    },
+    "ruff_changed_test": "passed",
+    "format_changed_test": "passed",
+    "model_calls": 0
+  },
+  "review_checks": {
+    "date": "2026-09-18",
+    "base_head_before_fixes": "4d240c0ea327b4ed6f9758ef89843083b6d7a4b7",
+    "implementation_commit": "d8da117e8caf63122d25cf85f15eccd4d29d2de7",
+    "scope": "PR #5 review fixes; no paid model calls or new real-run claims",
+    "ruff": "passed",
+    "format": "242 files passed",
+    "mypy": "237 source files passed; zero errors; dev dependencies; Linux platform typing",
+    "targeted_regressions": {
+      "passed": 22,
+      "failed": 0,
+      "command": "python -m pytest tests/benchmarks/memoryarena/test_review_scoring.py tests/benchmarks/memoryarena/test_services.py tests/benchmarks/memoryarena/test_prepare_assets_script.py -q"
+    },
+    "full_non_e2e_windows": {
+      "passed": 805,
+      "failed": 3,
+      "skipped": 13,
+      "failures": [
+        "tests.test_harbor_bridge.TestTrialConfigBuilder::test_basic_config",
+        "tests.test_orchestration.TestTaskDirGenerator::test_generate_structure",
+        "tests.test_run_index.TestWriteRunIndex::test_index_marks_complete_with_trials"
+      ],
+      "note": "The three failures are Windows path/execute-bit assertions and match the documented upstream baseline; PYTHONUTF8=1 was used for this run."
+    },
+    "mock_smokes": {
+      "passed": 6,
+      "configs": [
+        "examples/locomo_mini.yaml",
+        "examples/user_preference.yaml",
+        "configs/smoke/locomo_transfer.yaml",
+        "configs/smoke/locomo_test_only.yaml",
+        "configs/smoke/shopping_transfer.yaml",
+        "configs/smoke/shopping_test_only.yaml"
+      ],
+      "note": "PYTHONUTF8=1; mock mode; no model calls"
+    },
+    "build": "wheel and sdist passed",
+    "docker": "not run: Docker Desktop Linux engine failed to start on the local Windows host; GitHub Linux CI remains authoritative",
+    "implemented_boundaries": [
+      "Search managed final-session retrieval evidence is required before judge invocation",
+      "Travel derived online diagnostics are separated from official score and PS/SPS/SR remains not measured",
+      "Shopping WebShop backend lifecycle and stable provenance are owned by ArenaServices",
+      "Prepare-assets manifests are fully typed and included in lint/mypy scope"
+    ]
+  },
+  "rebase_checks": {
+    "date": "2026-09-17",
+    "implementation_commit": "1a132d02e8867dd4e17efc45d30f8b0619eb71b6",
+    "upstream_commit": "1b48fc3e54e8282f00b710083ee24e6f12b14c70",
+    "pre_rebase_head": "9e85d686479a4eb872aa5643730d31934fdadab3",
+    "platform": "Windows / Python 3.12.11",
+    "source_and_tests_sha256": "d632ac23a8b5f73016685ce3a94afcb7b746c0c5ce45c990d5b86f8d627b6cf4",
+    "source_hash_normalization": "LF line endings; sorted git-tracked src, tests, pyproject.toml and uv.lock paths",
+    "full_non_e2e": {
+      "passed": 748,
+      "failed": 3,
+      "skipped": 13
+    },
+    "official_parity_passed_in_full_suite": 33,
+    "windows_failures_reproduced_on_upstream": [
+      "tests.test_harbor_bridge.TestTrialConfigBuilder::test_basic_config",
+      "tests.test_orchestration.TestTaskDirGenerator::test_generate_structure",
+      "tests.test_run_index.TestWriteRunIndex::test_index_marks_complete_with_trials"
+    ],
+    "new_failed_test_identities": [],
+    "ruff": "passed",
+    "format": "229 files passed",
+    "mypy": "228 source files passed; zero errors",
+    "wheel_and_sdist": "passed",
+    "example_and_mock_smokes": [
+      {
+        "config": "examples/locomo_mini.yaml",
+        "command": [
+          "-m",
+          "dumemeval",
+          "run",
+          "--config",
+          "examples/locomo_mini.yaml",
+          "--mock",
+          "--no-resume"
+        ],
+        "exit_code": 0
+      },
+      {
+        "config": "examples/user_preference.yaml",
+        "command": [
+          "-m",
+          "dumemeval",
+          "run",
+          "--config",
+          "examples/user_preference.yaml",
+          "--mock",
+          "--no-resume"
+        ],
+        "exit_code": 0
+      },
+      {
+        "config": "configs/smoke/locomo_transfer.yaml",
+        "command": [
+          "-m",
+          "dumemeval",
+          "run",
+          "--config",
+          "configs/smoke/locomo_transfer.yaml",
+          "--mock",
+          "--no-resume"
+        ],
+        "exit_code": 0
+      },
+      {
+        "config": "configs/smoke/locomo_test_only.yaml",
+        "command": [
+          "-m",
+          "dumemeval",
+          "run",
+          "--config",
+          "configs/smoke/locomo_test_only.yaml",
+          "--mock",
+          "--no-resume"
+        ],
+        "exit_code": 0
+      },
+      {
+        "config": "configs/smoke/shopping_transfer.yaml",
+        "command": [
+          "-m",
+          "dumemeval",
+          "run",
+          "--config",
+          "configs/smoke/shopping_transfer.yaml",
+          "--mock",
+          "--no-resume"
+        ],
+        "exit_code": 0
+      },
+      {
+        "config": "configs/smoke/shopping_test_only.yaml",
+        "command": [
+          "-m",
+          "dumemeval",
+          "run",
+          "--config",
+          "configs/smoke/shopping_test_only.yaml",
+          "--mock",
+          "--no-resume"
+        ],
+        "exit_code": 0
+      }
+    ],
+    "independent_conflict_and_contract_review": "passed",
+    "model_calls": 0,
+    "evidence": "evidence/checks.zip: rebase-1b48fc3/"
+  }
+}

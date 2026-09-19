@@ -41,6 +41,9 @@ class AgentSpec(BaseModel):
     # 开放命名：任意 Harbor 已安装 agent（claude-code/hermes/goose/...），
     # 未知名由 Harbor AgentFactory 报错（不在此白名单，避免加 agent 改 core）
     runtime: str = Field(default="claude-code")
+    version: str | None = Field(
+        default=None, description="Installed agent version; None uses the runtime default"
+    )
     model: str | None = Field(
         default=None,
         description="agent 模型；None = 由执行引擎 / Harbor 决定。框架不预设厂商模型",
@@ -240,7 +243,9 @@ class JudgeSpec(BaseModel):
     max_tokens: int = Field(default=1024, ge=1)
     temperature: float = Field(default=0.0, ge=0, le=2)
     num_runs: int = Field(default=1, ge=1, description="LLM-as-Judge 重复次数（多数票 + 分数均值）")
-    max_retries: int = Field(default=3, ge=0, description="瞬时错误最多尝试次数（含首次；0 视为 1）")
+    max_retries: int = Field(
+        default=3, ge=0, description="明确 429 拒绝最多尝试次数（含首次；0 视为 1）；送达不确定时不重试"
+    )
     skip_failed: bool = Field(default=False, description="judge 失败时记 SKIPPED 而非中断")
     save_model_input: bool = Field(default=False, description="把 judge user prompt 写入 Verdict.model_input")
 

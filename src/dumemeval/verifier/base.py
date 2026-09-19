@@ -17,6 +17,7 @@ class Verdict(BaseModel):
     raw: str = Field(default="", description="judge 原始输出")
     runs: int = Field(default=1, ge=1, description="LLM-as-Judge 实际运行次数")
     run_scores: list[float] = Field(default_factory=list, description="各次运行的 score")
+    run_raws: list[str] = Field(default_factory=list, description="各次运行的原始 judge 输出")
     model_input: str | None = Field(default=None, description="judge user prompt（save_model_input 时填写）")
 
     @property

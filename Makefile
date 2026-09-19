@@ -46,8 +46,8 @@ test:
 	$(UV) run pytest tests/ -m "not e2e"
 
 lint:
-	$(UV) run ruff check src tests
-	$(UV) run ruff format --check src tests
+	$(UV) run ruff check src tests configs/memoryarena
+	$(UV) run ruff format --check src tests configs/memoryarena
 	$(UV) run mypy
 
 coverage:

@@ -55,6 +55,7 @@ def load_task_result(output_dir: str | Path, task_name: str) -> TaskExecution | 
         return None
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
-        return TaskExecution.model_validate(raw)
+        result = TaskExecution.model_validate(raw)
+        return result if result.status == "completed" and all(s.success for s in result.sessions) else None
     except (OSError, json.JSONDecodeError, ValueError):
         return None

@@ -1,0 +1,57 @@
+{
+  "research_date": "2026-09-14",
+  "repository": "https://github.com/ZexueHe/MemoryArena",
+  "commit": "6cd9de14b71915e39ac742a20dc33785e14b6aab",
+  "code_license": "unspecified: no root LICENSE or license declaration in reviewed setup/README files",
+  "dataset": "ZexueHe/memoryarena",
+  "dataset_revision": "da1a37c8b19280e18627ca01cf368195a5e1d92e",
+  "dataset_license": "unspecified: no license field in dataset card",
+  "split": "test",
+  "files": {
+    "run_shopping.py": "a5b1ed584c3bdd818522f8b2c45d96cfb07738616ae1997681a32765162ac8ff",
+    "run_travel.py": "4ee85595d3a7753c8da1eecccdc35eb930e16cea834197e1f44ebc48b04332b6",
+    "run_search.py": "e32c603cee73dc221192749f5e80c468858d4e7be4df9273a586a683c3c5077a",
+    "run_math.py": "acd5fc80554d75e670e0da2889315d806ed1fb2b7f0d7e714f1bd76b83aac6bd",
+    "setup_web_shopping.md": "8be213ad278fa7463932ac257bd94043ea6524c72fc426fd7030ecb36ca0163f",
+    "setup_travel.md": "3beadccd1857ebd156f1410b2d143471b5d7f41d2105f7f5eb4f09e0f188bc9b",
+    "setup_web_search_env.md": "357d642b58a3eb1f9f1646d5a040170b9b7f7fdcc831cabcd4bfa52e845879eb",
+    "setup_formal_reasoning.md": "68f077e74c471cd40af6d53235b850933f89693039ebe7ec10b8b9468e4b2e50",
+    "env/env_client.py": "db49f2fb6bcd25668505bc2af29017a446eff29ae0611daff2279c2267f399b0",
+    "env/env_server.py": "28a88ecb55152db3d863bc823d92c025bae273dc452effd2b3669950b9f3149a",
+    "env/env_systems/webshop_env.py": "1d57a37789517e76d06aadbdde2fa4f7b5c9f8d122fd617da9f707d0153ae0be",
+    "env/env_systems/travel_env.py": "47020c4ef8ba877c62f87bbb1076229af199f58dcd4d0257ddd34b39b54bfe50",
+    "env/env_systems/browsecomp_plus_env.py": "e8cdbe25658e96d086ee7445c442bdac2fc62d9429ce32757716f9a04e6d8339",
+    "env/env_systems/math_env.py": "173d63f838597ec3a02c6623d168c25c530fd431bdbe49ec816fe965479a70f6",
+    "env/env_systems/travel_planner_env/data_loader.py": "8d54384689882d71337cd1b5bb887d79db73b64d998b63a68a70957aa94e0c47",
+    "env/env_systems/travel_planner_env/tool_executor.py": "6ba85b47e4f50c87c3a26ce61ed2d9fb91910297b8a31774ee876d8ca68825ee",
+    "env/env_systems/web_shopping_env/runtime/runner/task_files.py": "82bd4dddac1cb8ae37b11de75d2628c39a843edf624a0a6c9d6151a566ecf7cc",
+    "env/env_systems/web_search_env/searcher/tools.py": "40f78e368ed044bdfe79d790580fe05c0b3d433a1512c6e9c456b8b84209db0e",
+    "env/env_systems/web_search_env/evaluate_with_openai.py": "16cefdd5a5efd4422167d7dc44cafbd7041fda2df5b387ddea2f57134d0de403",
+    "env/env_systems/formal_reasoning_env/eval.py": "7610922a139539c697ff0b074b57eb279e9339f81acced2203e3812b794ef13b"
+  },
+  "evidence_scope": "Source and asset provenance; integration results and archive hashes are in acceptance.md and verification.json",
+  "integration_verification_date": "2026-09-15",
+  "external_assets": {
+    "ai-hyz/MemoryArena-product-db": {
+      "revision": "46120a5c931d04a47bd791965d757207b7372b62",
+      "license": "unspecified"
+    },
+    "Tevatron/browsecomp-plus-corpus": {
+      "revision": "b27b02bc3e45511b8b82a13e6f90ce761df726f6",
+      "license": "mit"
+    },
+    "Qwen/Qwen3-0.6B": {
+      "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+      "license": "apache-2.0"
+    },
+    "shopping_full_items": {
+      "size": 5479720229,
+      "sha256": "2ef591d65df3af89e972ab72468eb82cbf124d876552d9f3678667edd620a6c8"
+    },
+    "flights": {
+      "url": "https://drive.usercontent.google.com/download?id=1dNtxHFv7k0PeMHI0smZk8t-dBlWLA0Gz&export=download&confirm=t",
+      "sha256": "8dafdb0e3f8b79ce599a1e612a772865295bc226b46e5fb278368f7255b11cee",
+      "license": "unspecified in the reviewed database source"
+    }
+  }
+}

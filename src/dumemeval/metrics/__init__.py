@@ -9,6 +9,18 @@ Benchmark 计算器走注册表：加数据集不必改 get_benchmark_calculator
 - benchmarks/：各数据集官方口径计算器
 """
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from dumemeval.benchmarks.memoryarena.metrics import (
+        MemoryArenaMathCalculator,
+        MemoryArenaPhysCalculator,
+        MemoryArenaSearchCalculator,
+        MemoryArenaShoppingCalculator,
+        MemoryArenaTravelCalculator,
+        judge_round,
+    )
+
 from .benchmarks import (
     CATEGORY_MAPPING,
     BeamCalculator,
@@ -21,11 +33,6 @@ from .benchmarks import (
     LongMemEvalCalculator,
     MemoraCalculator,
     MemoryAgentBenchCalculator,
-    MemoryArenaMathCalculator,
-    MemoryArenaPhysCalculator,
-    MemoryArenaSearchCalculator,
-    MemoryArenaShoppingCalculator,
-    MemoryArenaTravelCalculator,
     MemoryBenchCalculator,
     MemoryCDCalculator,
     MemSimCalculator,
@@ -33,7 +40,6 @@ from .benchmarks import (
     PersonaMemCalculator,
     ScriptMemCalculator,
     StreamMemBenchCalculator,
-    judge_round,
     locomo_f1,
     locomo_f1_multi,
     score_locomo_f1,
@@ -71,12 +77,7 @@ for _cls in (
     LocomoPlusCalculator,
     LongMemEvalCalculator,
     MemoryAgentBenchCalculator,
-    MemoryArenaTravelCalculator,
     MemoryBenchCalculator,
-    MemoryArenaShoppingCalculator,
-    MemoryArenaSearchCalculator,
-    MemoryArenaMathCalculator,
-    MemoryArenaPhysCalculator,
     PerLTQACalculator,
     PersonaMemCalculator,
     ScriptMemCalculator,
@@ -132,3 +133,19 @@ __all__ = [
     "round_items",
     "score_locomo_f1",
 ]
+
+
+def __getattr__(name: str) -> object:
+    """Keep published calculator exports while avoiding eager integration imports."""
+    if name in {
+        "MemoryArenaSearchCalculator",
+        "MemoryArenaShoppingCalculator",
+        "MemoryArenaTravelCalculator",
+        "MemoryArenaMathCalculator",
+        "MemoryArenaPhysCalculator",
+        "judge_round",
+    }:
+        from dumemeval.benchmarks.memoryarena import metrics
+
+        return getattr(metrics, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

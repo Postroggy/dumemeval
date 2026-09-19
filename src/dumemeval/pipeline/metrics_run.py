@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from ..metrics.core.registry import calculator_names, get_benchmark_calculator
 from ..models import BenchmarkResult, EvalTask, RunSummary, TaskResult
 
 RuleJudge = Callable[[str, str, str], bool]
@@ -21,6 +22,24 @@ def pool_benchmark(results: list[BenchmarkResult], warnings: list[str]) -> Bench
     name = results[0].benchmark
     if any(r.benchmark != name for r in results):
         raise ValueError("cannot aggregate different benchmarks in one run")
+    if len({r.score_scope for r in results}) != 1:
+        warnings.append("Official and derived measurements cannot be pooled together")
+        return BenchmarkResult(benchmark=name, score_scope="derived", coverage_note=warnings[-1])
+    coverage = " ".join(dict.fromkeys(r.coverage_note for r in results if r.coverage_note))
+    if coverage:
+        warnings.append(coverage)
+    if name in calculator_names():
+        official = get_benchmark_calculator(name).aggregate(results)
+        if official is not None:
+            official = official.model_copy(
+                update={
+                    "score_scope": results[0].score_scope,
+                    "coverage_note": coverage or official.coverage_note,
+                }
+            )
+            if not official.values:
+                warnings.append("Official aggregate is unmeasured: incomplete evidence or truncated tasks")
+            return official
     details = [d for r in results for d in r.details]
     if details and all("f1" in d for d in details):
         values = {
@@ -41,17 +60,24 @@ def pool_benchmark(results: list[BenchmarkResult], warnings: list[str]) -> Bench
             values[f"accuracy_{category}"] = totals["accuracy"]
         return BenchmarkResult(
             benchmark=name,
+            score_scope=results[0].score_scope,
+            coverage_note=coverage,
             primary_metric="f1",
             values=values,
             by_category=by_category,
             details=details,
         )
     warnings.append(f"benchmark {name} 无 per-QA 明细，pooled 值退化为 task 间平均")
-    keys = set().union(*(r.values for r in results))
+    keys = set.intersection(*(set(r.values) for r in results))
+    if any(set(r.values) != keys for r in results):
+        warnings.append("Incomplete benchmark measurements: unavailable metrics remain unmeasured")
     return BenchmarkResult(
         benchmark=name,
+        score_scope=results[0].score_scope,
+        coverage_note=coverage,
         primary_metric=results[0].primary_metric,
         values={k: sum(r.values.get(k, 0.0) for r in results) / len(results) for k in keys},
+        details=details,
     )
 
 
@@ -91,7 +117,12 @@ def run_metrics(summary: RunSummary, results: list[TaskResult]) -> dict[str, flo
         metrics["trace.trace_captured_rate"] = sum(t.trace_captured_rate for t in traced) / count
         metrics["trace.empty_output_rate"] = sum(t.empty_output_rate for t in traced) / count
         metrics["trace.error_rate"] = sum(t.error_rate for t in traced) / count
-        metrics["trace.memory_tool_used_rate"] = sum(1.0 for t in traced if t.memory_tool_used) / count
+        measured = [t for t in traced if t.memory_tool_used is not None]
+        metrics["trace.memory_observation_coverage"] = len(measured) / count
+        if measured:
+            metrics["trace.memory_tool_used_rate"] = sum(bool(t.memory_tool_used) for t in measured) / len(
+                measured
+            )
     return metrics
 
 

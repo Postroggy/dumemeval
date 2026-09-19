@@ -11,9 +11,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
-from ..models import SessionOutcome, SessionSpec
+from ..models import EvalTask, SessionOutcome, SessionSpec
 
 __all__ = ["SessionExecutor", "SessionOutcome"]
 
@@ -24,6 +27,11 @@ class SessionExecutor(ABC):
     注意：执行器不感知 memory 后端（不接收 adapter 参数）。
     memory 生命周期（注入/快照/收集）由 SessionRunner 编排。
     """
+
+    @asynccontextmanager
+    async def task_scope(self, task: EvalTask, output_dir: Path) -> AsyncIterator[SessionExecutor]:
+        """Acquire optional task resources; stateless executors simply reuse themselves."""
+        yield self
 
     @abstractmethod
     async def run_session(

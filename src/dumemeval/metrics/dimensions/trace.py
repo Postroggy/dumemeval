@@ -35,26 +35,35 @@ class TraceCalculator(MetricCalculator):
             trace_captured_rate=captured_rate,
             empty_output_rate=1.0 - captured_rate if total else 0.0,
             error_rate=errored / total if total else 0.0,
-            memory_tool_used=bool(writes or reads),
-            memory_write_ops=writes,
-            memory_read_ops=reads,
+            memory_tool_used=True if writes or reads else None,
+            memory_write_ops=writes or None,
+            memory_read_ops=reads or None,
             details=self._details(outcomes),
         )
 
-        bundle = MetricBundle(
+        values = {
+            "trace_captured_rate": trace.trace_captured_rate,
+            "empty_output_rate": trace.empty_output_rate,
+            "error_rate": trace.error_rate,
+        }
+        for name in ("memory_tool_used", "memory_write_ops", "memory_read_ops"):
+            value = getattr(trace, name)
+            if value is not None:
+                values[name] = float(value)
+        return MetricBundle(
             name=self.name,
             kind=self.kind,
-            values={
-                "trace_captured_rate": trace.trace_captured_rate,
-                "empty_output_rate": trace.empty_output_rate,
-                "error_rate": trace.error_rate,
-                "memory_tool_used": 1.0 if trace.memory_tool_used else 0.0,
-                "memory_write_ops": float(writes),
-                "memory_read_ops": float(reads),
-            },
-            details=trace.details,
+            values=values,
+            details=[
+                *trace.details,
+                {
+                    "memory_observation": "positive evidence only; counts are lower bounds, absent evidence is unmeasured",
+                    "sources": sorted(
+                        {op.source for op in ops if op.op in MEMORY_WRITE_OPS | MEMORY_READ_OPS}
+                    ),
+                },
+            ],
         )
-        return bundle
 
     @staticmethod
     def _details(outcomes: list[SessionOutcome]) -> list[dict[str, Any]]:

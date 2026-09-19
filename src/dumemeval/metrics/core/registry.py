@@ -16,7 +16,6 @@ JudgeFn = Callable[[str, str, str], bool]
 
 _REGISTRY: dict[str, type[MetricCalculator]] = {}
 _ALIASES: dict[str, str] = {
-    "memoryarena": "memoryarena_travel",
     "memdaily": "memsim",
 }
 

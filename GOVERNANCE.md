@@ -88,6 +88,20 @@ flowchart BT
 
 ## 指标语义（勿过度解读）
 
+- **MemoryArena Travel**：当前是自定义独立会话流程，on/off 不等价于官方 memory seed / 累计历史。
+  `derived_round_success` / `derived_slot_accuracy` 仅诊断在线七槽位判定，官方六槽位 PS/SPS/SR
+  与官方对照未覆盖。JSON 的 official_score 为空，不可把派生值引用为官方成绩。
+- **MemoryArena Search 受管环境**：最终会话缺少宿主采集的成功 search/get_document 证据时，
+  accuracy 未测且不调用 judge；前轮检索和 Agent 自报检索不构成证据。
+
+- **MemoryArena Shopping**：正式分数要求 host 采集的环境购买记录；没有记录时为未测，
+  商品属性评分和属性 reward fallback 未覆盖，不从 Agent 文本计算替代分数。
+  不再从 agent 文本提及的 ASIN 推导购买成功。截断样本不报告完整 bundle 的 overall_success。
+  默认按官方单商品环境独立评分，前一商品错误不影响后一商品的正确性；整包成功仍要求全部正确。
+  接入状态与剩余工作见 [MemoryArena 设计](docs/datasets/memoryarena/README.md)。
+- **MemoryArena Search 多次判分**：`num_runs>1` 是显式多数票扩展；accuracy 使用聚合判定，
+  `judge_score` 保留通过比例，并记录逐次原文。不要将末次回答替代多数票，也不要与单次判分混报。
+
 - **Quality.precision**：当前是「含任一 GT fact 的 memory 文件占比」，不是 HaluMem 论文那种逐条标注 precision。
 - **Quality.update_accuracy**：未实现时为 `None`（报告 n/a），不是 0。
 - **Utility.memory_conditioned_gain**：需要对照基线（`test_only` vs 有 memory）；单次评测经常为 0。

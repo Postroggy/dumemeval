@@ -50,6 +50,10 @@ class RunProvenance(BaseModel):
     judging_skip_failed: bool = False
     config_path: str = ""
     output_dir: str = ""
+    controls: dict[str, str] = Field(
+        default_factory=dict, description="Hashes of controlled experiment inputs"
+    )
+    runtime_versions: dict[str, str] = Field(default_factory=dict)
 
 
 # ── 整批摘要 ────────────────────────────────────────────────────────────────
@@ -63,6 +67,7 @@ class TaskSummary(BaseModel):
     n_success: int = 0
     report_dir: str = ""
     benchmark_f1: float | None = None
+    execution_status: str = "completed"
 
 
 class RunSummary(BaseModel):

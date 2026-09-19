@@ -68,15 +68,16 @@ class TestTraceCalculator:
         )
         assert bundle.values["error_rate"] == 0.5
 
-    def test_no_memory_ops_flags_unused_memory(self) -> None:
-        """memory 配了却一次没读写 → memory_tool_used=0（业务最关心的失败模式）。"""
+    def test_no_memory_ops_is_unmeasured(self) -> None:
+        """Issue #4: absent observations cannot establish zero memory use."""
         bundle = TraceCalculator().calculate(
             MetricInput(
                 execution=_execution([{"session_id": 1, "success": True, "observation": "ok", "error": None}])
             )
         )
-        assert bundle.values["memory_tool_used"] == 0.0
-        assert bundle.values["memory_write_ops"] == 0.0
+        assert "memory_tool_used" not in bundle.values
+        assert "memory_write_ops" not in bundle.values
+        assert "memory_read_ops" not in bundle.values
 
     def test_lifecycle_ops_do_not_count_as_agent_memory_use(self) -> None:
         """setup/inject/snapshot 是框架动作，不能算 agent 用了 memory。"""
@@ -92,7 +93,9 @@ class TestTraceCalculator:
                 )
             )
         )
-        assert bundle.values["memory_tool_used"] == 0.0
+        assert "memory_tool_used" not in bundle.values
+        assert "memory_write_ops" not in bundle.values
+        assert "memory_read_ops" not in bundle.values
 
     def test_no_sessions_is_zero_not_crash(self) -> None:
         bundle = TraceCalculator().calculate(MetricInput(execution=_execution([])))

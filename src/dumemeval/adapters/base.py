@@ -15,7 +15,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, ClassVar
 
-from ..models import EvalTask, MemoryMount, MemoryOp, MemoryOpName, MemorySpec, SessionSpec
+from ..models import EvalTask, MemoryMount, MemoryOp, MemoryOpName, MemorySpec, SessionOutcome, SessionSpec
 
 # session_ctx 里的注入通道键名（执行器消费）
 MEMORY_MOUNTS_KEY = "memory_mounts"
@@ -44,6 +44,8 @@ class BaseMemoryAdapter(ABC):
     """
 
     type_name: ClassVar[str] = ""
+    supports_initial_memory: ClassVar[bool] = False
+    supports_host_history: ClassVar[bool] = False
 
     def __init__(self, spec: MemorySpec):
         self.spec = spec
@@ -77,12 +79,20 @@ class BaseMemoryAdapter(ABC):
     def observe(self, session: SessionSpec) -> list[MemoryOp]:
         """观测该 session 期间发生的 memory 读写。"""
 
+    def observe_execution(self, session: SessionSpec, outcome: SessionOutcome) -> None:
+        """Collect optional runtime evidence after a session; existing adapters need no hook."""
+        return None
+
     def seed_history(self, task: EvalTask) -> None:
         """评测前注入历史对话（可选覆写；默认 no-op）。
 
         benchmark 评测需要"先把历史记忆灌进被测 memory"时（如 Hermes 的
         L0 对话灌入），adapter 覆写本方法从 task.data 取对话并写入。
         """
+        return None
+
+    def append_history(self, session: SessionSpec, entry: str) -> None:
+        """Store host-captured environment history after a completed round."""
         return None
 
     def memory_usage_hint(self) -> str | None:

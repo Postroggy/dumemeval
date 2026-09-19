@@ -5,7 +5,8 @@ agent 经 HTTP env server 逐步 ``search[...]`` / ``click[...]`` / ``click[Buy 
 ``info.last_purchased_asin`` 才是可打分的购买结果。本适配器把任务目标写成
 EvalTask，并把 ``task_environment`` 指到 webshop；**不把商品目录摊进 instruction**。
 
-官方指标：ASIN exact match（match_ground_truth）+ overall_success + attribute 字符串匹配。
+官方指标：ASIN exact match（match_ground_truth）、overall_success，以及通过固定上游
+compute_reward.py 计算的完整 reward；属性判定使用官方 LLM judge 或字符串 fallback。
 
 Source: https://github.com/ZexueHe/MemoryArena · Paper: https://arxiv.org/abs/2602.16313
 """
@@ -16,9 +17,11 @@ from typing import Any
 
 from pydantic import BaseModel, Field, JsonValue
 
-from ...models import EvalTask, SessionSpec
-from ..benchmark import BenchmarkAdapter, BenchmarkData, register_benchmark
-from ._common import query_text
+from dumemeval.datasets.benchmark import BenchmarkAdapter, BenchmarkData, register_benchmark
+from dumemeval.datasets.benchmarks._common import query_text
+from dumemeval.models import EvalTask, SessionSpec
+
+from ._validation import take, validate_ids, validate_rounds
 
 
 class ShoppingSample(BaseModel):
@@ -33,7 +36,11 @@ class MemoryArenaShoppingData(BenchmarkData):
 
     @classmethod
     def from_raw(cls, raw: Any) -> MemoryArenaShoppingData:
-        return cls(samples=[ShoppingSample.model_validate(item) for item in raw])
+        samples = [ShoppingSample.model_validate(item) for item in raw]
+        validate_ids([sample.id for sample in samples])
+        for sample in samples:
+            validate_rounds(sample.questions, sample.answers)
+        return cls(samples=samples)
 
 
 @register_benchmark
@@ -55,10 +62,10 @@ class MemoryArenaShoppingAdapter(BenchmarkAdapter):
         if not isinstance(data, MemoryArenaShoppingData):
             raise TypeError(f"Expected MemoryArenaShoppingData, got {type(data)}")
         tasks: list[EvalTask] = []
-        samples = data.samples[:subset] if subset else data.samples
+        samples = take(data.samples, subset)
         for item in samples:
-            questions = item.questions[:max_questions] if max_questions else item.questions
-            answers = item.answers[:max_questions] if max_questions else item.answers
+            questions = take(item.questions, max_questions)
+            answers = take(item.answers, max_questions)
             if not questions:
                 continue
             sessions = [
@@ -76,6 +83,8 @@ class MemoryArenaShoppingAdapter(BenchmarkAdapter):
                     description=f"MemoryArena bundled_shopping {item.category or item.id}",
                     sessions=sessions,
                     data={
+                        "sample_id": item.id,
+                        "source_round_count": len(item.questions),
                         "questions": [query_text(q) for q in questions],
                         "answers": answers,
                         "category": item.category,
@@ -95,8 +104,7 @@ def _shopping_instruction(goal: str, step: int, n_steps: int) -> str:
     """把官方任务目标交给 agent，并强制走 webshop 动作，而不是在文本里假装购买。"""
     return (
         f"这是 bundled_shopping 第 {step}/{n_steps} 个购买步骤。\n"
-        "你必须通过任务环境（TASK_ENV_URL / WEBSHOP_ENV_URL）完成购买："
-        "每回合只输出一个 search[...] 或 click[...] 动作，直到 click[Buy Now]。\n"
+        "你必须通过任务环境提供的工具完成实际购买，并以环境返回的购买结果为准。\n"
         "不要编造 ASIN，不要在没有 env 观测的情况下声称已购买。\n"
         "本步目标：\n\n"
         f"{goal}"

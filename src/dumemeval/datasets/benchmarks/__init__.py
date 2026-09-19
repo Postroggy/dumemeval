@@ -1,5 +1,6 @@
 """内置 benchmark 适配器（import 即注册）。"""
 
+from ...benchmarks.memoryarena import datasets as _memoryarena  # noqa: F401
 from . import (
     beam,  # noqa: F401
     clbench,  # noqa: F401
@@ -10,10 +11,6 @@ from . import (
     longmemeval,  # noqa: F401
     memora,  # noqa: F401
     memoryagentbench,  # noqa: F401
-    memoryarena_reasoning,  # noqa: F401
-    memoryarena_search,  # noqa: F401
-    memoryarena_shopping,  # noqa: F401
-    memoryarena_travel,  # noqa: F401
     memorybench,  # noqa: F401
     memorycd,  # noqa: F401
     memsim,  # noqa: F401

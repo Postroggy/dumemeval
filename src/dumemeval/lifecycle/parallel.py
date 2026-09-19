@@ -18,6 +18,7 @@ import asyncio
 import logging
 from collections.abc import Callable
 from pathlib import Path
+from uuid import uuid4
 
 from ..adapters.base import BaseMemoryAdapter
 from ..core.protocol import EvalProtocol
@@ -80,7 +81,13 @@ class ParallelTaskRunner:
                     # 兼容性回退（单 task 失败不影响整批评测），非吞异常：
                     # 错误写入 TaskExecution.sessions 并记日志
                     logger.exception("task %s 编排失败", task.name)
-                    failed = TaskExecution(task_id=task.name, task_name=task.name, memory_backend="(failed)")
+                    failed = TaskExecution(
+                        task_id=task.name,
+                        task_name=task.name,
+                        memory_backend="(failed)",
+                        status="failed",
+                        error=f"{type(e).__name__}: {e}",
+                    )
                     # session_id 从 1 起（SessionOutcome 约束 >= 1）；0 为非法
                     failed.sessions.append(
                         SessionOutcome(session_id=1, success=False, error=f"{type(e).__name__}: {e}")
@@ -102,15 +109,25 @@ class ParallelTaskRunner:
             if cached is not None:
                 logger.info("resume: 跳过已完成 task %s", task.name)
                 return cached
-        runner = SessionRunner(
-            adapter=adapter,
-            executor=self.executor,
-            protocol=self.protocol,
-            snapshot_dir=self.output_dir / "snapshots" / adapter.name / task.name,
-            memory_transfer=MemoryTransfer(
-                transfer_dir=self.output_dir / "memory" / "transfer" / task.name,
-            ),
-        )
-        result = await runner.run(task)
+        result: TaskExecution | None = None
+        attempt = uuid4().hex
+        try:
+            async with self.executor.task_scope(task, self.output_dir) as executor:
+                runner = SessionRunner(
+                    adapter=adapter,
+                    executor=executor,
+                    protocol=self.protocol,
+                    snapshot_dir=self.output_dir / "snapshots" / adapter.name / task.name,
+                    memory_transfer=MemoryTransfer(
+                        transfer_dir=self.output_dir / "memory" / "transfer" / task.name / attempt,
+                        mount_source=self.output_dir / "memory" / "mounts" / task.name / attempt,
+                    ),
+                )
+                result = await runner.run(task)
+        except Exception as exc:
+            if result is None:
+                raise
+            result.status = "failed"
+            result.error = f"Task resource cleanup failed: {type(exc).__name__}: {exc}"
         save_task_result(self.output_dir, result)
         return result

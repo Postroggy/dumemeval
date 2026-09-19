@@ -30,6 +30,22 @@ _LOWER_IS_BETTER = (
     "tokens_out",
 )
 
+# Minimum evidence for every completed run, independent of the benchmark.
+# Legacy reports remain readable, but absent fields cannot establish comparability.
+_REQUIRED_CONTROLS = frozenset(
+    (
+        "tasks",
+        "dataset",
+        "agent",
+        "agent_skills",
+        "judge",
+        "runtime",
+        "task_environment",
+        "code",
+        "observed_prompts",
+    )
+)
+
 
 def direction_of(metric: str) -> MetricDirection:
     """按指标名判定方向（cost/latency/幻觉/错误率等越低越好）。"""
@@ -109,6 +125,43 @@ def compare_runs(runs: list[RunRef], baseline: str | None = None) -> RunComparis
 def comparability_warnings(runs: list[RunRef]) -> list[str]:
     """控制变量不一致时显式警告（业务据此判断这张表能不能引用）。"""
     warnings: list[str] = []
+
+    for ref in runs:
+        benchmark = ref.summary.benchmark
+        if benchmark is not None and benchmark.score_scope == "derived":
+            warnings.append(
+                f"{ref.label}: derived diagnostics only; official benchmark comparison is not covered. "
+                + benchmark.coverage_note
+            )
+
+    fingerprints = [ref.provenance.controls if ref.provenance else {} for ref in runs]
+    for ref, fields in zip(runs, fingerprints, strict=True):
+        missing = sorted(key for key in _REQUIRED_CONTROLS if not fields.get(key, "").strip())
+        if missing:
+            warnings.append(
+                f"Required control fingerprints are missing for {ref.label}: {', '.join(missing)}; "
+                "experiment comparability is unverified"
+            )
+    for state, description in (
+        ("not-observed", "Control evidence was not observed"),
+        ("not-controlled", "Control factors are not controlled"),
+    ):
+        for ref, fields in zip(runs, fingerprints, strict=True):
+            affected = sorted(key for key, value in fields.items() if value == state)
+            if affected:
+                warnings.append(
+                    f"{description} for {ref.label}: {', '.join(affected)}; "
+                    "experiment comparability is unverified"
+                )
+    if all(fingerprints):
+        keys = set().union(*(set(fields) for fields in fingerprints))
+        for key in sorted(keys):
+            if len({fields.get(key) for fields in fingerprints}) > 1:
+                warnings.append(
+                    f"Controlled input differs: {key}; this comparison is not a controlled ablation"
+                )
+    if any(task.execution_status != "completed" for ref in runs for task in ref.summary.per_task):
+        warnings.append("Incomplete executions are present; missing measurements cannot be treated as zero")
 
     mocked = [ref.label for ref in runs if _is_mock(ref)]
     if mocked:

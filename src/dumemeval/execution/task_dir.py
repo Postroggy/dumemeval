@@ -154,10 +154,10 @@ class TaskDirGenerator:
         (task_dir / "tests").mkdir(parents=True, exist_ok=True)
         (task_dir / "environment").mkdir(parents=True, exist_ok=True)
 
-        instruction = session.instruction
-        if instruction_suffix:
-            instruction = f"{session.instruction}\n{instruction_suffix}"
-        (task_dir / "instruction.md").write_text(instruction)
+        from ..core.instructions import render_instruction
+
+        instruction = render_instruction(session.instruction, instruction_suffix)
+        (task_dir / "instruction.md").write_text(instruction, encoding="utf-8", newline="\n")
         self._write_task_toml(task_dir, session)
         self._write_verifier(task_dir, session)
         self._write_dockerfile(task_dir)

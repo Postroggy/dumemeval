@@ -53,12 +53,11 @@ def _render_markdown(summary: RunSummary, provenance: RunProvenance | None) -> s
 def _benchmark_section(summary: RunSummary) -> list[str]:
     if summary.benchmark is None:
         return []
-    lines = [
-        f"## Benchmark[{summary.benchmark.benchmark}]（pooled，官方口径）",
-        "",
-        "| 指标 | 值 |",
-        "|---|---|",
-    ]
+    scope = "官方口径" if summary.benchmark.score_scope == "official" else "派生诊断，官方分数未测"
+    lines = [f"## Benchmark[{summary.benchmark.benchmark}]（pooled，{scope}）"]
+    if summary.benchmark.coverage_note:
+        lines += ["", summary.benchmark.coverage_note]
+    lines += ["", "| 指标 | 值 |", "|---|---|"]
     for key, value in summary.benchmark.values.items():
         lines.append(f"| {key} | {value:.4f} |")
     if summary.benchmark.by_category:

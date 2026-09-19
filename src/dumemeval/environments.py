@@ -1,9 +1,8 @@
 """任务环境层：agentic 环境的可插拔扩展点。
 
-agent-first 的环境缺口：MemoryArena 类任务里 agent 应在环境（webshop、旅行
-规划器）中行动，而不是读摊平的文本。本模块定义 provider 契约——框架只负责把
-环境**暴露给 agent**（endpoint / 使用提示 / env 变量），环境内行动的评分走各
-benchmark 官方口径。各官方环境 server（webshop / travel …）是社区插件。
+本模块定义 provider 契约和注册表，具体环境实现在数据集包中。
+provider 暴露 endpoint / 使用提示 / env 变量，或提供受管准备与运行时。
+环境内行动的评分走各 benchmark 官方口径，记忆仍由 memory adapter 管理。
 
 与 memory adapter 同范式：``register_task_environment`` 注册，执行层不感知
 具体环境产品（lifecycle 经 session_ctx 消费，见 memory-instruction 契约）。
@@ -13,8 +12,16 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from functools import cache
+from pathlib import Path
+from typing import TYPE_CHECKING
 
-from .models import TaskEnvSpec
+from .models import EvalTask, TaskEnvSpec
+from .task_environments.base import EnvironmentPreparation, TaskEnvironmentRuntime
+
+if TYPE_CHECKING:
+    from .benchmarks.memoryarena.environment.providers import (
+        WebshopTaskEnvironment,
+    )
 
 __all__ = [
     "HttpTaskEnvironment",
@@ -31,6 +38,17 @@ class TaskEnvironmentProvider(ABC):
     """任务环境 provider 契约。子类设置 ``name`` 并实现三个方法。"""
 
     name: str = ""
+    observed_control_keys: tuple[str, ...] = ()
+
+    def prepare(self, spec: TaskEnvSpec, *, clone: bool = False) -> EnvironmentPreparation:
+        """Inspect provisioned inputs; managed providers may opt into source preparation."""
+        raise ValueError(f"Task environment {self.name!r} does not support managed preparation")
+
+    def create_runtime(
+        self, task: EvalTask, spec: TaskEnvSpec, output_dir: Path
+    ) -> TaskEnvironmentRuntime | None:
+        """Optionally own a task runtime; endpoint-only providers remain compatible."""
+        return None
 
     @abstractmethod
     def endpoint(self, spec: TaskEnvSpec) -> str | None:
@@ -66,55 +84,8 @@ class HttpTaskEnvironment(TaskEnvironmentProvider):
         return {"TASK_ENV_URL": endpoint} if endpoint else {}
 
 
-class WebshopTaskEnvironment(HttpTaskEnvironment):
-    """MemoryArena 官方 webshop：HTTP env server + search[]/click[] 动作空间。
-
-    协议对齐 vendors/MemoryArena/env/env_client.py：
-    POST /env/initialize、/env/reset、/env/step、/env/get_observation、/env/close。
-    框架只把 endpoint 和动作空间暴露给 agent；购买结果的官方打分仍走
-    metrics.benchmarks.memoryarena_shopping（ASIN exact match）。
-    """
-
-    name = "webshop"
-
-    def usage_hint(self, spec: TaskEnvSpec) -> str | None:
-        endpoint = self.endpoint(spec)
-        if not endpoint:
-            return None
-        custom = str(spec.config.get("usage_hint") or "")
-        official = (
-            f"任务环境是 MemoryArena webshop，服务 {endpoint}（env TASK_ENV_URL / WEBSHOP_ENV_URL）。\n"
-            "协议（JSON POST）：\n"
-            '- /env/initialize {task_id, env_name: "webshop", env_config}\n'
-            "- /env/reset {task_id, seed}\n"
-            "- /env/step {task_id, action}  → observation / reward / done / info\n"
-            "- /env/get_observation {task_id}\n"
-            "- /env/close {task_id}\n"
-            "每回合只能发一个动作，格式必须是：\n"
-            "- search[keywords]\n"
-            "- click[product_id]  （点商品用 ASIN/ID，不要用商品名）\n"
-            "- click[Back to Search] / click[< Prev] / click[Next >]\n"
-            "- click[Buy Now]  （购买当前商品；info.last_purchased_asin 即本回合结果）\n"
-            "- click[option_value]  （颜色/尺码等）\n"
-            "不要把动作写在纯文本里假装买过；必须经 env server 走完 search→click→Buy Now。"
-        )
-        return f"{official}\n{custom}" if custom else official
-
-    def env_vars(self, spec: TaskEnvSpec) -> dict[str, str]:
-        endpoint = self.endpoint(spec)
-        if not endpoint:
-            return {}
-        env_name = str(spec.config.get("env_name") or "webshop")
-        return {
-            "TASK_ENV_URL": endpoint,
-            "WEBSHOP_ENV_URL": endpoint,
-            "WEBSHOP_ENV_NAME": env_name,
-        }
-
-
 _PROVIDER_REGISTRY: dict[str, type[TaskEnvironmentProvider]] = {
     HttpTaskEnvironment.name: HttpTaskEnvironment,
-    WebshopTaskEnvironment.name: WebshopTaskEnvironment,
 }
 
 
@@ -123,6 +94,7 @@ def register_task_environment(cls: type[TaskEnvironmentProvider]) -> type[TaskEn
     if not getattr(cls, "name", None):
         raise ValueError(f"{cls.__name__} must set ClassVar name")
     _PROVIDER_REGISTRY[cls.name] = cls
+    _provider_instance.cache_clear()
     return cls
 
 
@@ -141,3 +113,16 @@ def _provider_instance(name: str) -> TaskEnvironmentProvider:
 def get_task_environment(name: str) -> TaskEnvironmentProvider:
     """按名取 provider 单例。"""
     return _provider_instance(name)
+
+
+def __getattr__(name: str) -> object:
+    """Preserve the published provider imports without eager implementation imports."""
+    if name in {"WebshopTaskEnvironment", "MemoryArenaTaskEnvironment"}:
+        from .benchmarks.memoryarena.environment import providers
+
+        return getattr(providers, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+# Define the provider contract and registry before importing their implementations.
+from .benchmarks.memoryarena.environment import providers as _memoryarena  # noqa: E402, F401

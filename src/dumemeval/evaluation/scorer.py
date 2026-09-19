@@ -29,6 +29,8 @@ class CalculatorBenchmarkScorer(BenchmarkScorer):
         bundle: MetricBundle = get_benchmark_calculator(self.benchmark, **self.options).calculate(inp)
         return BenchmarkResult(
             benchmark=bundle.name,
+            score_scope=bundle.score_scope,
+            coverage_note=bundle.coverage_note,
             primary_metric=_primary_metric(bundle),
             values=bundle.values,
             by_category=bundle.by_category,
@@ -37,7 +39,15 @@ class CalculatorBenchmarkScorer(BenchmarkScorer):
 
 
 def _primary_metric(bundle: MetricBundle) -> str | None:
-    for name in ("f1", "accuracy", "score", "solving_rate", "success_rate"):
+    for name in (
+        "overall_average_passrate",
+        "overall_success",
+        "f1",
+        "accuracy",
+        "score",
+        "solving_rate",
+        "success_rate",
+    ):
         if name in bundle.values:
             return name
     return next(iter(bundle.values), None)

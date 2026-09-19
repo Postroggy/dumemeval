@@ -20,6 +20,14 @@ from ..datasets import prepare as prep
 
 
 def cmd_prepare(args: argparse.Namespace) -> int:
+    if getattr(args, "environment_config", None):
+        from ..config import load_config
+        from ..task_environments.prepare import prepare_environment
+
+        cfg = load_config(args.environment_config)
+        report = prepare_environment(cfg, clone=args.clone_reference)
+        print(report.model_dump_json(indent=2))
+        return 0 if report.ready else 1
     root = Path(args.root).expanduser() if args.root else None
     datasets = tuple(prep.downloadable_names()) if args.dataset == "all" else (args.dataset,)
 

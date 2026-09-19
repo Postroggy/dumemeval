@@ -24,6 +24,7 @@ class MountConfig(BaseModel):
     type: Literal["bind"] = Field(default="bind")
     source: str = Field(description="host 路径")
     target: str = Field(description="容器内路径")
+    read_only: bool = False
 
 
 class HarborEnvironmentConfig(BaseModel):
@@ -44,6 +45,7 @@ class HarborAgentConfig(BaseModel):
     """Harbor agent 配置。"""
 
     name: str = Field(default="claude-code")
+    version: str | None = None
     model: str | None = None
     setup_timeout_sec: float = Field(default=900.0, ge=0)
     temperature: float | None = Field(default=None, ge=0, le=2)
@@ -88,6 +90,8 @@ def build_trial_config(
         dict: TrialConfig 的字段（可直接 TrialConfig(**result)）
     """
     agent_kwargs: dict[str, Any] = {}
+    if config.agent.version:
+        agent_kwargs["version"] = config.agent.version
     if memory_dir:
         agent_kwargs["memory_dir"] = memory_dir
     if config.agent.temperature is not None:
@@ -124,13 +128,16 @@ def build_trial_config(
             "delete": config.environment.delete,
             "force_build": config.environment.force_build,
         },
-        "verifier": {"type": "script", "timeout_sec": 600.0},
+        "verifier": {"override_timeout_sec": 600.0},
     }
     mounts = list(config.environment.mounts)
     if extra_mounts:
         mounts.extend(extra_mounts)
     if mounts:
-        cfg["environment"]["mounts"] = [m.model_dump() for m in mounts]
+        cfg["environment"]["mounts"] = [
+            {**m.model_dump(exclude={"read_only"}), **({"read_only": True} if m.read_only else {})}
+            for m in mounts
+        ]
     if env:
         # Harbor 侧经 EnvironmentConfig.env → docker compose environment 注入容器
         cfg["environment"]["env"] = env

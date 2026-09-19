@@ -8,6 +8,11 @@ from typing import Any
 
 def is_responses_unsupported(exc: Exception) -> bool:
     """仅对明确的 Responses API 不支持类错误回退；鉴权等真错误返回 False。"""
+    status = getattr(exc, "status_code", None)
+    if status is None:
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+    if status not in (400, 404, 405, 422, 501):
+        return False
     msg = str(exc).lower()
     if any(marker in msg for marker in ("not implemented", "unsupported", "not support")):
         return True
@@ -39,7 +44,7 @@ class OpenAIJudgeClient:
             raise ImportError(
                 "LLMJudgeVerifier (openai provider) requires `openai` package. Install with: pip install openai"
             ) from e
-        kwargs: dict[str, Any] = {"api_key": api_key}
+        kwargs: dict[str, Any] = {"api_key": api_key, "max_retries": 0}
         if base_url:
             kwargs["base_url"] = normalize_openai_base_url(base_url)
         self._client: Any = OpenAI(**kwargs)
@@ -60,11 +65,7 @@ class OpenAIJudgeClient:
                     temperature=temperature,
                     max_output_tokens=max_tokens,
                 )
-                return "".join(
-                    getattr(item, "text", "") or ""
-                    for item in getattr(resp, "output", [])
-                    if getattr(item, "type", "") == "message"
-                )
+                return str(resp.output_text or "")
             except Exception as e:
                 if is_responses_unsupported(e):
                     self._logger.debug("Responses API 不可用（%s），回退 chat completions", e)
@@ -94,7 +95,7 @@ class AnthropicJudgeClient:
                 "LLMJudgeVerifier (anthropic provider) requires `anthropic` package. "
                 "Install with: pip install anthropic"
             ) from e
-        kwargs: dict[str, Any] = {"api_key": api_key}
+        kwargs: dict[str, Any] = {"api_key": api_key, "max_retries": 0}
         if base_url:
             kwargs["base_url"] = base_url
         self._client: Any = Anthropic(**kwargs)

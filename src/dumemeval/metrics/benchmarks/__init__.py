@@ -5,6 +5,20 @@
 新增数据集：实现 MetricCalculator 子类 → 在 metrics/__init__.py 注册。
 """
 
+from typing import TYPE_CHECKING
+
+from dumemeval.benchmarks.memoryarena import metrics as _memoryarena  # noqa: F401
+
+if TYPE_CHECKING:
+    from dumemeval.benchmarks.memoryarena.metrics import (
+        MemoryArenaMathCalculator,
+        MemoryArenaPhysCalculator,
+        MemoryArenaSearchCalculator,
+        MemoryArenaShoppingCalculator,
+        MemoryArenaTravelCalculator,
+        judge_round,
+    )
+
 from .beam import BeamCalculator
 from .clbench import CLBenchCalculator
 from .evermembench_dynamic import EverMemBenchDynamicCalculator
@@ -21,10 +35,6 @@ from .locomo_plus import LocomoPlusCalculator
 from .longmemeval import LongMemEvalCalculator
 from .memora import MemoraCalculator
 from .memoryagentbench import MemoryAgentBenchCalculator
-from .memoryarena import MemoryArenaTravelCalculator, judge_round
-from .memoryarena_reasoning import MemoryArenaMathCalculator, MemoryArenaPhysCalculator
-from .memoryarena_search import MemoryArenaSearchCalculator
-from .memoryarena_shopping import MemoryArenaShoppingCalculator
 from .memorybench import MemoryBenchCalculator
 from .memorycd import MemoryCDCalculator
 from .memsim import MemSimCalculator
@@ -62,3 +72,19 @@ __all__ = [
     "locomo_f1_multi",
     "score_locomo_f1",
 ]
+
+
+def __getattr__(name: str) -> object:
+    """Keep published calculator exports while avoiding eager integration imports."""
+    if name in {
+        "MemoryArenaSearchCalculator",
+        "MemoryArenaShoppingCalculator",
+        "MemoryArenaTravelCalculator",
+        "MemoryArenaMathCalculator",
+        "MemoryArenaPhysCalculator",
+        "judge_round",
+    }:
+        from dumemeval.benchmarks.memoryarena import metrics
+
+        return getattr(metrics, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -301,6 +301,8 @@ class TestRunSession:
     @pytest.mark.asyncio
     async def test_run_session_mock_trial(self, bridge: HarborBridge, tmp_path: Path) -> None:
         """mock Harbor Trial，验证 run_session 全流程。"""
+        import hashlib
+
         session = SessionSpec(id=1, instruction="记住偏好")
 
         fake_trial = FakeTrial(trial_dir=tmp_path / "trial")
@@ -311,13 +313,19 @@ class TestRunSession:
         with patch("harbor.trial.trial.Trial.create", new=AsyncMock(return_value=fake_trial)):
             outcome = await bridge.run_session(
                 session,
-                {"memory_transfer_dir": str(tmp_path / "transfer"), "task_name": "locomo_0"},
+                {
+                    "memory_transfer_dir": str(tmp_path / "transfer"),
+                    "task_name": "locomo_0",
+                    "instruction_suffix": "执行时追加的提示",
+                },
             )
 
         assert outcome.success is True
         assert outcome.reward == 1.0
         # task 目录应生成（按 task_name 隔离，跨 task 并行防冲突）
-        assert (tmp_path / "tasks" / "locomo_0__session_1" / "instruction.md").exists()
+        instruction = (tmp_path / "tasks" / "locomo_0__session_1" / "instruction.md").read_bytes()
+        assert instruction.decode("utf-8") == "记住偏好\n执行时追加的提示"
+        assert outcome.instruction_sha256 == hashlib.sha256(instruction).hexdigest()
 
 
 class TestArtifacts:

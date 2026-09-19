@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from ...models import (
     AgentOutput,
+    BenchmarkResult,
     EfficiencyResult,
     EvalTask,
     MemoryFact,
@@ -25,6 +26,7 @@ from ...models import (
     TraceResult,
     UtilityResult,
 )
+from ...models.results import ScoreScope
 
 MetricKind = Literal["quality", "utility", "efficiency", "trace", "benchmark"]
 
@@ -65,6 +67,8 @@ class MetricBundle(BaseModel):
 
     name: str
     kind: MetricKind
+    score_scope: ScoreScope = "official"
+    coverage_note: str = ""
     values: dict[str, float] = Field(default_factory=dict)
     by_category: dict[str, dict[str, float]] = Field(default_factory=dict)
     details: list[dict[str, Any]] = Field(default_factory=list)
@@ -76,6 +80,10 @@ class MetricCalculator(ABC):
     name: ClassVar[str]
     kind: ClassVar[MetricKind]
     metrics: ClassVar[tuple[str, ...] | list[str]] = ()
+
+    def aggregate(self, results: list[BenchmarkResult]) -> BenchmarkResult | None:
+        """Optional official aggregation policy; None selects the shared fallback."""
+        return None
 
     @abstractmethod
     def calculate(self, inp: MetricInput) -> MetricBundle:
@@ -172,12 +180,22 @@ def query_of(item: Any) -> str:
 
 def prediction_for_item(outputs: list[AgentOutput], query: str, index: int) -> str:
     """按 query 对齐预测；找不到时再按 round 下标（ingest 之后的评分子 session）。"""
-    by_query = {item.query: item.output for item in outputs}
-    if query in by_query:
-        return by_query[query]
+    matches = [item.output for item in outputs if item.query == query]
+    if len(matches) == 1:
+        return matches[0]
     if 0 <= index < len(outputs):
         return outputs[index].output
     return ""
+
+
+def outcome_for_round(inp: MetricInput, index: int) -> SessionOutcome | None:
+    """Resolve a scored round by session identity, excluding context-only sessions."""
+    if inp.task is None:
+        return None
+    sessions = [session for session in inp.task.sessions if session.query is not None]
+    if index >= len(sessions):
+        return None
+    return next((o for o in inp.outcomes if o.session_id == sessions[index].id), None)
 
 
 def round_items(inp: MetricInput) -> Iterator[tuple[int, Any, str, Any, str]]:
@@ -191,10 +209,17 @@ def round_items(inp: MetricInput) -> Iterator[tuple[int, Any, str, Any, str]]:
     data = inp.task.data if inp.task is not None and isinstance(inp.task.data, dict) else {}
     questions = data.get("questions") or []
     answers = data.get("answers") or []
+    sessions = [session for session in inp.task.sessions if session.query is not None] if inp.task else []
+    by_session = {
+        sample.session_id: sample.response for sample in inp.samples if sample.session_id is not None
+    }
     for idx, question in enumerate(questions):
         query = query_of(question)
         gold = answers[idx] if idx < len(answers) else ""
-        pred = prediction_for_item(inp.outputs, query, idx)
+        if by_session and len(sessions) == len(questions):
+            pred = by_session.get(sessions[idx].id, "")
+        else:
+            pred = prediction_for_item(inp.outputs, query, idx)
         yield idx, question, query, gold, pred
 
 

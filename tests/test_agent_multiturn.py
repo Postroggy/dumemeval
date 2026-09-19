@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+from typing import cast
 from unittest.mock import patch
 
 import pytest
@@ -9,13 +10,15 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import dumemeval.datasets.benchmarks  # noqa: F401
+from dumemeval.benchmarks.memoryarena.datasets.reasoning import MemoryArenaMathAdapter, MemoryArenaPhysAdapter
+from dumemeval.benchmarks.memoryarena.datasets.search import MemoryArenaSearchAdapter
+from dumemeval.benchmarks.memoryarena.datasets.travel import MemoryArenaTravelAdapter
 from dumemeval.datasets import get_benchmark
-from dumemeval.datasets.benchmarks.memoryarena_reasoning import MemoryArenaMathAdapter, MemoryArenaPhysAdapter
-from dumemeval.datasets.benchmarks.memoryarena_search import MemoryArenaSearchAdapter
 from dumemeval.metrics import get_benchmark_calculator, outputs_from_execution
 from dumemeval.metrics.benchmarks.streammembench import token_overlap_score
 from dumemeval.metrics.core.base import MetricInput
 from dumemeval.models import AgentOutput, EvalTask, SessionOutcome, TaskExecution
+from dumemeval.models.environment import EnvironmentEvidence
 from dumemeval.verifier.base import Verdict
 from dumemeval.verifier.parsers import parse_judge_response
 
@@ -91,6 +94,35 @@ PASSING_FOLLOWUP = (
 )
 
 
+def _scoring_input(
+    task: EvalTask, outputs: list[AgentOutput], purchases: list[list[str]] | None = None
+) -> MetricInput:
+    """Explicit completed fixture sessions; text alone is not execution evidence."""
+    return MetricInput(
+        task=task,
+        outputs=outputs,
+        outcomes=[
+            SessionOutcome(
+                session_id=session.id,
+                success=True,
+                observation=output.output,
+                environment=EnvironmentEvidence(
+                    task_id=f"product-{index}",
+                    env_name="webshop",
+                    operation="step",
+                    info={
+                        "episode_scope": "session",
+                        "purchased_asins": [str(asin) for asin in purchases[index]],
+                    },
+                )
+                if purchases is not None
+                else None,
+            )
+            for index, (session, output) in enumerate(zip(task.sessions, outputs, strict=True))
+        ],
+    )
+
+
 class TestMemoryArenaShopping:
     def test_build_uses_question_text(self) -> None:
         a = get_benchmark("memoryarena_shopping")
@@ -98,12 +130,21 @@ class TestMemoryArenaShopping:
         assert task.benchmark == "memoryarena_shopping"
         assert len(task.sessions) == 2
         assert "Buy almond flour B00TUDFEW2" in task.sessions[0].instruction
-        assert "search[" in task.sessions[0].instruction
+        # Tool entry points belong to the selected environment, not the task template.
+        for session in task.sessions:
+            for entry in ("TASK_ENV_URL", "WEBSHOP_ENV_URL", "arena_tool.py", "search[", "click["):
+                assert entry not in session.instruction
         assert task.task_environment.get("type") == "webshop"
-        assert a.metrics() == ["match_ground_truth", "overall_success", "attribute_match"]
+        assert a.metrics() == [
+            "match_ground_truth",
+            "overall_success",
+            "attribute_match_ratio",
+            "average_reward",
+            "reward_item_success",
+        ]
 
     def test_subset_and_max_questions(self) -> None:
-        from dumemeval.datasets.benchmarks.memoryarena_shopping import MemoryArenaShoppingAdapter
+        from dumemeval.benchmarks.memoryarena.datasets.shopping import MemoryArenaShoppingAdapter
 
         raw = [
             *SHOPPING_RAW,
@@ -128,12 +169,15 @@ class TestMemoryArenaShopping:
             AgentOutput(query="Buy almond flour B00TUDFEW2", output="Purchased B00TUDFEW2 Almond Flour"),
             AgentOutput(query="Buy muffin pan B08957C9ZH", output="Purchased B08957C9ZH Muffin Pan"),
         ]
-        metrics = a.evaluate(task, outputs)
+        # Issue #4 scores host purchase records, not ASIN mentions in the answer.
+        inp = _scoring_input(task, outputs, [["B00TUDFEW2"], ["B08957C9ZH"]])
+        metrics = get_benchmark_calculator(a.name).calculate(inp).values
         assert metrics["match_ground_truth"] == 1.0
         assert metrics["overall_success"] == 1.0
-        assert metrics["attribute_match"] == 1.0
-        assert "round_success" not in metrics.values
-        assert "f1" not in metrics.values
+        assert "attribute_match" not in metrics
+        assert "round_success" not in metrics
+        assert "f1" not in metrics
+        assert a.evaluate(task, outputs).values == {}
 
     def test_partial_step_not_overall_success(self) -> None:
         a = get_benchmark("memoryarena_shopping")
@@ -142,7 +186,8 @@ class TestMemoryArenaShopping:
             AgentOutput(query="Buy almond flour B00TUDFEW2", output="B00TUDFEW2 Almond Flour"),
             AgentOutput(query="Buy muffin pan B08957C9ZH", output="bought something else"),
         ]
-        metrics = a.evaluate(task, outputs)
+        inp = _scoring_input(task, outputs, [["B00TUDFEW2"], ["B000000099"]])
+        metrics = get_benchmark_calculator(a.name).calculate(inp).values
         assert metrics["match_ground_truth"] == pytest.approx(0.5)
         assert metrics["overall_success"] == 0.0
 
@@ -160,23 +205,31 @@ class TestMemoryArenaSearch:
             AgentOutput(query="Where did they work next?", output="She later worked in Lagos."),
         ]
         with patch("dumemeval.verifier.LLMJudgeVerifier.verify") as mock_verify:
-            mock_verify.return_value = Verdict(label="yes", score=1.0, reason="matches")
-            metrics = a.evaluate(task, outputs)
-        assert mock_verify.call_count == 2
+            mock_verify.return_value = Verdict(
+                label="yes",
+                score=1.0,
+                reason="matches",
+                raw="extracted_final_answer: Lagos\ncorrect: yes\nconfidence: 80",
+            )
+            metrics = get_benchmark_calculator(a.name).calculate(_scoring_input(task, outputs)).values
+        # The official search unit is the original final combined query.
+        assert mock_verify.call_count == 1
+        assert mock_verify.call_args.kwargs["question"] == "Where did they work next?"
         assert metrics["accuracy"] == 1.0
-        assert "f1" not in metrics.values
-        assert "match_ground_truth" not in metrics.values
-        assert "round_success" not in metrics.values
+        assert "f1" not in metrics
+        assert "match_ground_truth" not in metrics
+        assert "round_success" not in metrics
 
-    def test_empty_prediction_counts_incorrect_without_calling_llm(self) -> None:
-        """空预测（agent 没输出）不该浪费一次 LLM 调用，直接判错。"""
+    def test_absent_execution_is_unmeasured_without_calling_llm(self) -> None:
+        """No final-query execution means unmeasured, not a measured incorrect answer."""
         a = get_benchmark("memoryarena_search")
         task = a.build_tasks(a.data_type.from_raw(SEARCH_RAW))[0]
         outputs: list[AgentOutput] = []
         with patch("dumemeval.verifier.LLMJudgeVerifier.verify") as mock_verify:
             metrics = a.evaluate(task, outputs)
         assert mock_verify.call_count == 0
-        assert metrics["accuracy"] == 0.0
+        assert metrics.values == {}
+        assert metrics.details[0]["score_status"] == "not_measured"
 
     def test_injected_grader(self) -> None:
         a = MemoryArenaSearchAdapter(judge=lambda pred, gold, _q: gold[:12].lower() in pred.lower())
@@ -185,8 +238,11 @@ class TestMemoryArenaSearch:
             AgentOutput(query="Who started via an audition?", output="Sonia Uche started via an audition."),
             AgentOutput(query="Where did they work next?", output="unrelated"),
         ]
-        metrics = a.evaluate(task, outputs)
-        assert metrics["accuracy"] == pytest.approx(0.5)
+        calculator = get_benchmark_calculator(
+            a.name, judge=lambda pred, gold, _q: gold[:12].lower() in pred.lower()
+        )
+        metrics = calculator.calculate(_scoring_input(task, outputs)).values
+        assert metrics["accuracy"] == 0.0  # Correct context cannot offset a wrong final query.
 
     def test_parse_judge_response(self) -> None:
         parsed = parse_judge_response("extracted_final_answer: Sonia\ncorrect: yes\nconfidence: 80")
@@ -201,7 +257,7 @@ class TestMemoryArenaReasoning:
         assert "LaTeX:" in task.sessions[0].instruction
         assert r"Find $\nu(p)$." in task.sessions[0].instruction
         assert r"$\nu(p)=\overline{ev}_p$" not in task.sessions[0].instruction
-        assert a.metrics() == ["is_correct"]
+        assert a.metrics() == ["is_correct", "avg_progress_score", "overall_average_passrate"]
 
     def test_no_judge_falls_back_to_llm_judge(self) -> None:
         """无显式 judge 注入时应懒加载 LLMJudgeVerifier（math_equivalence prompt），
@@ -351,7 +407,7 @@ class TestOutputsFromExecution:
     def test_travel_session_count_mismatch_no_longer_misaligns(self) -> None:
         """travel 场景：1 个 memory 注入 session + N 个问答 session，
         session 数 != question 数。这是导致旧位置切片错位的真实场景。"""
-        a = get_benchmark("memoryarena_travel")
+        a = cast(MemoryArenaTravelAdapter, get_benchmark("memoryarena_travel"))
         travel_data = [
             {
                 "id": 0,
@@ -363,7 +419,7 @@ class TestOutputsFromExecution:
                 "answers": [{"days": 1, "transportation": "Flight F1"}, {"days": 2}],
             }
         ]
-        task = a.build_tasks(a.data_type.from_raw(travel_data))[0]
+        task = a.build_tasks(a.data_type.from_raw(travel_data), flow="custom")[0]
         assert len(task.sessions) == 3  # 1 注入 + 2 问答，session 数 != question 数（2）
         execution = _execution(
             SessionOutcome(session_id=1, observation="记住了偏好", query=task.sessions[0].query),

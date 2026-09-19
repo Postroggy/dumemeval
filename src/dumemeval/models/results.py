@@ -40,8 +40,13 @@ class SampleResult(BaseModel):
     verdict: Verdict | None = None
 
 
+ScoreScope = Literal["official", "derived"]
+
+
 class BenchmarkResult(BaseModel):
     benchmark: str
+    score_scope: ScoreScope = "official"
+    coverage_note: str = ""
     primary_metric: str | None = None
     values: dict[str, float] = Field(default_factory=dict)
     by_category: dict[str, dict[str, float]] = Field(default_factory=dict)
